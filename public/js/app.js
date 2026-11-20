@@ -126,14 +126,17 @@ function parseEkspor(rows, head) {
   const get = (r, k) => I[k] >= 0 ? String(r[I[k]] ?? '').trim() : '';
   const opt = (r, k) => OPT[k] >= 0 ? String(r[OPT[k]] ?? '').trim() : '';
 
-  const orders = []; const seen = new Set(); let cur = null;
+  const orders = []; const seen = new Set(); let cur = null; let skipping = false;
   rows.slice(1).forEach((r, k) => {
     const line = k + 1;
     if (!r.some(c => String(c).trim())) return;
     if (get(r, 'id')) {
       const id = get(r, 'id');
-      if (seen.has(id)) warn('error', `Order ${id} muncul lebih dari sekali (baris ${line}). Pcs dan total dihitung dua kali.`);
-      seen.add(id);
+      if (seen.has(id)) {
+        warn('error', `Order ${id} muncul lebih dari sekali (baris ${line}). Duplikat DIABAIKAN, hanya kemunculan pertama yang dihitung.`);
+        skipping = true; cur = null; return;
+      }
+      seen.add(id); skipping = false;
       if (get(r, 'sent') && !parseDate(get(r, 'sent'))) warn('warn', `Tanggal kirim tidak terbaca pada order ${id}: "${get(r, 'sent')}"`);
       cur = {
         id, buyer: get(r, 'buyer'), reseller: get(r, 'reseller'),
@@ -144,9 +147,9 @@ function parseEkspor(rows, head) {
       orders.push(cur);
     }
     if (get(r, 'prod')) {
-      if (!cur) { warn('error', `Baris produk tanpa order di baris ${line} (diabaikan): "${get(r, 'prod')}"`); return; }
+      if (!cur) { if (!skipping) warn('error', `Baris produk tanpa order di baris ${line} (diabaikan): "${get(r, 'prod')}"`); return; }
       const rawQty = get(r, 'qty');
-      if (!/^\d+$/.test(rawQty)) warn('warn', `Jumlah "${rawQty || '(kosong)'}" tidak valid pada order ${cur.id}, produk ${get(r, 'prod')} (dihitung 1)`);
+      if (!/^\d+$/.test(rawQty)) warn('error', `Jumlah "${rawQty || '(kosong)'}" tidak valid pada order ${cur.id}, produk ${get(r, 'prod')} (dihitung 1, periksa manual)`);
       const qty = toInt(rawQty) || 1, price = toInt(get(r, 'price'));
       cur.items.push({ prod: get(r, 'prod'), variasi: get(r, 'variasi'), sku: get(r, 'sku'),
                        qty, price, sub: qty * price, buyer: cur.buyer, orderId: cur.id, metode: '' });
@@ -160,6 +163,10 @@ function parseEkspor(rows, head) {
   return orders;
 }
 
+// ID seperti RIT-11012024-27 yang menempel di akhir nama (bukan bagian nama customer)
+const ID_IN_NAME = /\s+[A-Za-z]{2,}\d*-\d{6,}(?:-\d+)*\s*$/;
+const cleanName = raw => String(raw || '').trim().replace(/\s+/g, ' ').replace(ID_IN_NAME, '');
+
 // Template gudang: baris dengan Order Id / Nomor = order baru, baris kosong = item lanjutan. Tidak ada harga.
 function parseGudang(rows, head) {
   const idx = n => head.indexOf(n);
@@ -170,22 +177,27 @@ function parseGudang(rows, head) {
   };
   const get = (r, k) => C[k] >= 0 ? String(r[C[k]] ?? '').trim() : '';
 
-  const orders = []; const seen = new Set(); let cur = null;
+  const orders = []; const seen = new Set(); let cur = null; let skipping = false;
   rows.slice(1).forEach((r, k) => {
     const line = k + 1;
     if (!r.some(c => String(c).trim())) return;
     const oid = get(r, 'oid'), no = get(r, 'no');
     if (oid || no) {
       const id = oid || no;
-      if (seen.has(id)) warn('error', `Order ${id} muncul lebih dari sekali (baris ${line}). Pcs dihitung dua kali.`);
-      seen.add(id);
+      if (seen.has(id)) {
+        warn('error', `Order ${id} muncul lebih dari sekali (baris ${line}). Duplikat DIABAIKAN, hanya kemunculan pertama yang dihitung.`);
+        skipping = true; cur = null; return;
+      }
+      seen.add(id); skipping = false;
       const { note, resi } = cleanNote(get(r, 'catatan'));
       const metode = get(r, 'metode');
       if (!metode) warn('warn', `Metode pengiriman kosong pada order ${id}`);
       else if (!/PUSAT|DROPSHIP/i.test(metode)) warn('warn', `Metode pengiriman tidak dikenali "${metode}" pada order ${id}`);
-      const buyer = get(r, 'buyer');
+      const rawBuyer = get(r, 'buyer');
+      const buyer = cleanName(rawBuyer);
       if (!buyer) warn('warn', `Nama pembeli kosong pada order ${id}`);
-      else if (/\d/.test(buyer)) warn('info', `Nama pembeli memuat angka/ID: "${buyer}" (order ${id}). Nama dipakai apa adanya, pastikan konsisten.`);
+      else if (buyer !== rawBuyer.replace(/\s+/g, ' ')) warn('info', `ID dilepas dari nama "${rawBuyer}" (order ${id}), customer dikenali sebagai "${buyer}".`);
+      else if (/\d/.test(buyer)) warn('info', `Nama pembeli memuat angka: "${buyer}" (order ${id}). Pastikan penulisan konsisten.`);
       const created = get(r, 'created');
       const sent = parseDate(created);
       if (!sent) warn('warn', `Tanggal tidak terbaca pada order ${id}: "${created || '(kosong)'}"`);
@@ -198,9 +210,9 @@ function parseGudang(rows, head) {
       orders.push(cur);
     }
     if (get(r, 'prod')) {
-      if (!cur) { warn('error', `Baris produk tanpa order di baris ${line} (diabaikan): "${get(r, 'prod')}"`); return; }
+      if (!cur) { if (!skipping) warn('error', `Baris produk tanpa order di baris ${line} (diabaikan): "${get(r, 'prod')}"`); return; }
       const rawQty = get(r, 'qty');
-      if (!/^\d+$/.test(rawQty)) warn('warn', `Jumlah "${rawQty || '(kosong)'}" tidak valid pada order ${cur.id}, produk ${get(r, 'prod')} (dihitung 1)`);
+      if (!/^\d+$/.test(rawQty)) warn('error', `Jumlah "${rawQty || '(kosong)'}" tidak valid pada order ${cur.id}, produk ${get(r, 'prod')} (dihitung 1, periksa manual)`);
       cur.items.push({ prod: get(r, 'prod'), variasi: get(r, 'variasi'), sku: '',
                        qty: toInt(rawQty) || 1, price: 0, sub: 0,
                        buyer: cur.buyer, orderId: cur.id, metode: cur.metode });
