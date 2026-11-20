@@ -88,11 +88,14 @@ function cleanNote(raw) {
 
 // Dispatcher: deteksi format dari header
 function parseOrders(rows) {
+  // Abaikan baris penanda pemisah Excel (mis. "sep=,")
+  if (rows.length && /^sep=/i.test(String(rows[0][0] || ''))) rows = rows.slice(1);
   const head = rows[0].map(h => String(h).trim());
-  if (head.includes('Order Id')) { FORMAT = 'ekspor'; return parseEkspor(rows, head); }
+  // Template gudang dicek lebih dulu: versi terbaru juga memuat kolom "Order Id"
   if (head.includes('Nomor') && head.includes('Nama Produk') && head.includes('Metode Pengiriman')) {
     FORMAT = 'gudang'; return parseGudang(rows, head);
   }
+  if (head.includes('Order Id')) { FORMAT = 'ekspor'; return parseEkspor(rows, head); }
   throw new Error('Format tidak dikenali. Header harus berisi "Order Id" (ekspor berdu.id) atau "Nomor" + "Metode Pengiriman" (template gudang).');
 }
 
@@ -143,7 +146,7 @@ function parseEkspor(rows, head) {
 function parseGudang(rows, head) {
   const idx = n => head.indexOf(n);
   const C = {
-    no: idx('Nomor'), created: idx('Waktu Dibuat'), buyer: idx('Nama Depan'), prod: idx('Nama Produk'),
+    no: idx('Nomor'), oid: idx('Order Id'), created: idx('Waktu Dibuat'), buyer: idx('Nama Depan'), prod: idx('Nama Produk'),
     variasi: idx('Variasi Produk'), qty: idx('Jumlah Produk'), status: idx('Status Pengiriman'),
     metode: idx('Metode Pengiriman'), catatan: idx('Catatan dari pembeli')
   };
@@ -152,10 +155,10 @@ function parseGudang(rows, head) {
   const orders = []; let cur = null;
   for (const r of rows.slice(1)) {
     if (!r.some(c => String(c).trim())) continue;
-    if (get(r, 'no')) {
+    if (get(r, 'oid') || get(r, 'no')) {
       const { note, resi } = cleanNote(get(r, 'catatan'));
       cur = {
-        id: get(r, 'no'), buyer: get(r, 'buyer'), reseller: get(r, 'buyer'),
+        id: get(r, 'oid') || get(r, 'no'), buyer: get(r, 'buyer'), reseller: get(r, 'buyer'),
         sent: parseDate(get(r, 'created')), status: get(r, 'status'), metode: get(r, 'metode'),
         created: get(r, 'created'), discount: 0, total: 0, items: [],
         addr: '', tel: '', note, resi, mismatch: false
