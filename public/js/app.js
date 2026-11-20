@@ -201,7 +201,6 @@ const pillCls = m => /PUSAT/i.test(m)
   ? 'bg-indigo-50 text-indigo-700'
   : 'bg-amber-50 text-amber-700';
 const emptyHTML = t => `<div class="m-4 rounded-lg border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500">${t}</div>`;
-const toggleBtn = (id, open) => `<button type="button" class="toggle" data-toggle="${esc(id)}" aria-expanded="${open}" aria-label="Lihat detail"><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`;
 
 // Item digabung per produk; warna dijumlahkan
 function productGroups(items) {
@@ -329,41 +328,59 @@ function buildRekap(list) {
   }));
 }
 
-// ---------- tabel ----------
-function customersTableHTML() {
-  if (!PERSONS.length) return emptyHTML('Tidak ada data sesuai filter.');
-  const price = FORMAT === 'ekspor';
-  const body = PERSONS.map(p => {
+// ---------- ikon & tombol ----------
+const ICON = {
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  printer: '<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/>',
+  chevR: '<path d="M9 6l6 6-6 6"/>',
+  chevL: '<path d="M15 6l-6 6 6 6"/>',
+  chevsL: '<path d="M11 6l-6 6 6 6"/><path d="M18 6l-6 6 6 6"/>',
+  chevsR: '<path d="M13 6l6 6-6 6"/><path d="M6 6l6 6-6 6"/>',
+};
+const icon = (k, cls = 'h-3.5 w-3.5') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
+const btn = (kind, ic, label, attrs = '') => `<button type="button" class="btn btn-${kind}" ${attrs}>${icon(ic)}<span>${label}</span></button>`;
+const toggleBtn = (id, open) => `<button type="button" class="toggle" data-toggle="${esc(id)}" aria-expanded="${open}" aria-label="${open ? 'Tutup detail' : 'Lihat detail'}">${icon('chevR', 'chev')}</button>`;
+
+// ---------- tabel: state paginasi & animasi ----------
+const PAGE = { invoice: 1, rekap: 1 };
+const SIZE = { invoice: 10, rekap: 10 };
+const JUST = new Set();   // id yang baru dibuka; anaknya dianimasikan sekali
+let LAST_SIG = '';
+let BUSY = false;
+
+const animCls = parent => JUST.has(parent) ? ' anim' : '';
+const fx = (parent, i) => JUST.has(parent) ? ` style="--d:${i * 35}ms"` : '';
+
+// ---------- tabel: render ----------
+function invoiceTableHTML(rows, price) {
+  const body = rows.map(p => {
     const id = 'c:' + p.person;
     const open = EXPANDED.has(id);
-    let h = `<tr class="grp">
-      <td class="pl-3 w-10">${toggleBtn(id, open)}</td>
+    let h = `<tr class="grp${open ? ' open' : ''}" data-row="${esc(id)}">
+      <td class="w-12">${toggleBtn(id, open)}</td>
       <td><div class="font-semibold">${esc(p.name)}</div><div class="text-xs text-gray-500">${p.orderCount} order</div></td>
-      <td><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="rounded-full px-2 py-0.5 text-[11px] font-medium ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
+      <td><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="pill ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
       <td class="num">${p.invs.length}</td>
       <td class="num">${p.pcs}</td>
       ${price ? `<td class="num font-semibold">${rp(p.total)}</td>` : ''}
-      <td class="pr-4 text-right whitespace-nowrap"><button class="btn-sm" data-print-person="${esc(p.person)}">Cetak semua</button></td>
+      <td class="act">${btn('ghost', 'printer', 'Cetak semua', `data-print-person="${esc(p.person)}"`)}</td>
     </tr>`;
-    if (open) p.invs.forEach(inv => {
+    if (open) p.invs.forEach((inv, i) => {
       const pid = 'p:' + inv.key;
       const po = EXPANDED.has(pid);
-      h += `<tr class="sub">
-        <td class="pl-6">${toggleBtn(pid, po)}</td>
-        <td class="py-2"><div class="font-medium text-gray-900">${esc(inv.prod)}</div><div class="text-[11px] text-gray-500">Part ${inv.part} dari ${inv.partTotal} · ${esc(inv.invNo)}</div></td>
-        <td><span class="rounded-full px-2 py-0.5 text-[11px] font-medium ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
+      h += `<tr class="lvl1${animCls(id)}" data-parent="${esc(id)}" data-row="${esc(pid)}"${fx(id, i)}>
+        <td>${toggleBtn(pid, po)}</td>
+        <td><div class="font-medium text-gray-900">${esc(inv.prod)}</div><div class="text-[11px] text-gray-500">Part ${inv.part} dari ${inv.partTotal} · ${esc(inv.invNo)}</div></td>
+        <td><span class="pill ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
         <td></td>
         <td class="num">${inv.pcs}</td>
         ${price ? `<td class="num">${rp(inv.sub)}</td>` : ''}
-        <td class="pr-4 text-right whitespace-nowrap">
-          <button class="btn-sm" data-preview="${esc(inv.key)}">Preview</button>
-          <button class="btn-sm" data-print-one="${esc(inv.key)}">Cetak</button>
-        </td>
+        <td class="act">${btn('ghost', 'eye', 'Preview', `data-preview="${esc(inv.key)}"`)}${btn('dark', 'printer', 'Cetak', `data-print-one="${esc(inv.key)}"`)}</td>
       </tr>`;
-      if (po) inv.colors.forEach(c => {
-        h += `<tr class="sub">
+      if (po) inv.colors.forEach((c, j) => {
+        h += `<tr class="lvl2${animCls(pid)}" data-parent="${esc(pid)}"${fx(pid, j)}>
           <td></td>
-          <td class="py-1.5 pl-9 text-gray-600">${esc(c.warna)}${price && c.price !== null ? ` <span class="text-gray-400">· ${rp(c.price)}</span>` : ''}</td>
+          <td>${esc(c.warna)}${price && c.price !== null ? ` <span class="text-gray-400">· ${rp(c.price)}</span>` : ''}</td>
           <td></td><td></td>
           <td class="num">${c.qty}x</td>
           ${price ? `<td class="num">${rp(c.sub)}</td>` : ''}
@@ -374,41 +391,152 @@ function customersTableHTML() {
     return h;
   }).join('');
   const head = `<tr>
-    <th class="w-10"></th><th>Customer</th><th>Metode</th>
+    <th class="w-12"></th><th>Customer</th><th>Metode</th>
     <th class="num">Invoice</th><th class="num">Pcs</th>
     ${price ? '<th class="num">Total</th>' : ''}
-    <th class="pr-4 text-right">Aksi</th></tr>`;
+    <th class="act-h">Aksi</th></tr>`;
   return `<table class="dt"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
-function rekapTableHTML() {
-  if (!REKAP.length) return emptyHTML('Tidak ada data sesuai filter.');
-  const split = FORMAT === 'gudang';
-  const head = `<tr><th class="w-10"></th><th>Produk / Warna</th>
+function rekapTableHTML(rows, split) {
+  const head = `<tr><th class="w-12"></th><th>Produk / Warna</th>
     ${split ? '<th class="num">Gudang Pusat</th><th class="num">Dropship</th>' : ''}
-    <th class="num">Total qty</th><th class="pr-4 text-right">Order</th></tr>`;
-  const body = REKAP.map(p => {
+    <th class="num">Total qty</th><th class="num">Order</th></tr>`;
+  const body = rows.map(p => {
     const id = 'r:' + p.prod;
     const open = EXPANDED.has(id);
-    let h = `<tr class="grp">
-      <td class="pl-3">${toggleBtn(id, open)}</td>
+    let h = `<tr class="grp${open ? ' open' : ''}" data-row="${esc(id)}">
+      <td class="w-12">${toggleBtn(id, open)}</td>
       <td><div class="font-semibold">${esc(p.prod)}</div><div class="text-xs text-gray-500">${p.colors.length} warna</div></td>
       ${split ? `<td class="num">${p.pusat}</td><td class="num">${p.ds}</td>` : ''}
       <td class="num font-semibold">${p.total}</td>
-      <td class="pr-4 text-right tabular-nums">${p.orders}</td>
+      <td class="num">${p.orders}</td>
     </tr>`;
-    if (open) p.colors.forEach(c => {
-      h += `<tr class="sub">
+    if (open) p.colors.forEach((c, j) => {
+      h += `<tr class="lvl2${animCls(id)}" data-parent="${esc(id)}"${fx(id, j)}>
         <td></td>
-        <td class="py-1.5 pl-9 text-gray-600">${esc(c.warna)}</td>
+        <td>${esc(c.warna)}</td>
         ${split ? `<td class="num">${c.pusat}</td><td class="num">${c.ds}</td>` : ''}
         <td class="num">${c.total}</td>
-        <td class="pr-4 text-right tabular-nums">${c.orders}</td>
+        <td class="num">${c.orders}</td>
       </tr>`;
     });
     return h;
   }).join('');
   return `<table class="dt"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+// nomor halaman yang ditampilkan, '…' untuk celah
+function pageNums(cur, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const arr = [...new Set([1, pages, cur - 1, cur, cur + 1].filter(n => n >= 1 && n <= pages))].sort((a, b) => a - b);
+  const out = [];
+  arr.forEach((n, i) => { if (i && n - arr[i - 1] > 1) out.push('…'); out.push(n); });
+  return out;
+}
+
+function pageSlice(tab, items) {
+  const size = SIZE[tab];
+  const pages = Math.max(1, Math.ceil(items.length / size));
+  PAGE[tab] = Math.min(Math.max(1, PAGE[tab]), pages);
+  const start = (PAGE[tab] - 1) * size;
+  return { rows: items.slice(start, start + size), cur: PAGE[tab], pages, start, total: items.length };
+}
+
+function pagerHTML(tab, info, label) {
+  if (!info.total) return '';
+  const { cur, pages, start, total } = info;
+  const end = Math.min(start + SIZE[tab], total);
+  const ctrl = (n, disabled, ic, text, left) => {
+    const inner = left ? icon(ic) + `<span>${text}</span>` : `<span>${text}</span>` + icon(ic);
+    return `<button type="button" class="pager-ctrl" data-page="${tab}:${n}" ${disabled ? 'disabled' : ''} aria-label="${text}">${inner}</button>`;
+  };
+  const nums = pageNums(cur, pages).map(n => n === '…'
+    ? '<span class="pager-gap" aria-hidden="true">…</span>'
+    : `<button type="button" class="pg-num${n === cur ? ' pg-on' : ''}" data-page="${tab}:${n}"${n === cur ? ' aria-current="page"' : ''}>${n}</button>`).join('');
+  return `<nav class="pager" aria-label="Navigasi halaman">
+    <div class="pager-info">Menampilkan <b>${start + 1}–${end}</b> dari <b>${total}</b> ${label}</div>
+    <div class="pager-mid">
+      ${ctrl(1, cur <= 1, 'chevsL', 'Awal', true)}
+      ${ctrl(cur - 1, cur <= 1, 'chevL', 'Sebelumnya', true)}
+      <div class="pager-nums">${nums}</div>
+      ${ctrl(cur + 1, cur >= pages, 'chevR', 'Berikutnya', false)}
+      ${ctrl(pages, cur >= pages, 'chevsR', 'Akhir', false)}
+    </div>
+    <label class="pager-size">Per halaman
+      <select data-pagesize="${tab}">${[10, 25, 50].map(n => `<option value="${n}"${n === SIZE[tab] ? ' selected' : ''}>${n}</option>`).join('')}</select>
+    </label>
+  </nav>`;
+}
+
+function renderTables() {
+  const price = FORMAT === 'ekspor';
+  const split = FORMAT === 'gudang';
+
+  const inv = pageSlice('invoice', PERSONS);
+  $('list').innerHTML = inv.total ? invoiceTableHTML(inv.rows, price) : emptyHTML('Tidak ada data sesuai filter.');
+  $('pg-invoice').innerHTML = pagerHTML('invoice', inv, 'customer');
+
+  const rk = pageSlice('rekap', REKAP);
+  $('rekap').innerHTML = rk.total ? rekapTableHTML(rk.rows, split) : emptyHTML('Tidak ada data sesuai filter.');
+  $('pg-rekap').innerHTML = pagerHTML('rekap', rk, 'produk');
+
+  JUST.clear();
+}
+
+// ---------- tabel: toggle dengan animasi tutup ----------
+function markClosing(id) {
+  const opener = [...document.querySelectorAll('tr[data-row]')].find(tr => tr.dataset.row === id);
+  if (!opener) return;
+  const gone = new Set([id]);
+  for (const tr of opener.parentElement.rows) {
+    if (gone.has(tr.dataset.parent)) {
+      tr.classList.add('closing');
+      if (tr.dataset.row) gone.add(tr.dataset.row);
+    }
+  }
+}
+
+function onToggle(id) {
+  if (BUSY) return;
+  if (EXPANDED.has(id)) {
+    BUSY = true;
+    markClosing(id);
+    setTimeout(() => { EXPANDED.delete(id); BUSY = false; renderTables(); }, 200);
+  } else {
+    EXPANDED.add(id);
+    JUST.add(id);
+    renderTables();
+  }
+}
+
+function onTableClick(e) {
+  const t = e.target.closest('[data-toggle]');
+  if (t) return onToggle(t.dataset.toggle);
+  const pv = e.target.closest('[data-preview]');
+  if (pv) return showPreview(pv.dataset.preview);
+  const one = e.target.closest('[data-print-one]');
+  if (one) return doPrint(INVOICES.filter(i => i.key === one.dataset.printOne));
+  const per = e.target.closest('[data-print-person]');
+  if (per) return doPrint(INVOICES.filter(i => i.person === per.dataset.printPerson));
+}
+
+function onPager(e) {
+  const b = e.target.closest('[data-page]');
+  if (!b || b.disabled) return;
+  const [tab, n] = b.dataset.page.split(':');
+  PAGE[tab] = Number(n);
+  renderTables();
+  $(tab === 'invoice' ? 'list' : 'rekap').scrollTop = 0;
+}
+
+function onPageSize(e) {
+  const s = e.target.closest('[data-pagesize]');
+  if (!s) return;
+  const tab = s.dataset.pagesize;
+  SIZE[tab] = Number(s.value);
+  PAGE[tab] = 1;
+  renderTables();
 }
 
 // ---------- invoice ----------
@@ -510,17 +638,15 @@ function renderAll() {
     $('st-total').textContent = rp(sum(list.map(o => o.total)));
   }
   $('cust-count').textContent = PERSONS.length ? `${PERSONS.length} customer · ${INVOICES.length} invoice` : '';
-  $('list').innerHTML = customersTableHTML();
-  $('rekap').innerHTML = rekapTableHTML();
+  const sig = [METODE_SEL, $('q').value, FORMAT, FILE_NAME].join('|');
+  if (sig !== LAST_SIG) { PAGE.invoice = 1; PAGE.rekap = 1; LAST_SIG = sig; }
+  renderTables();
   $('btn-print-all').disabled = !INVOICES.length;
   $('btn-print-rekap').disabled = !REKAP.length;
 
   if (SELECTED && !INVOICES.some(i => i.key === SELECTED)) closeModal();
   else if (SELECTED) refreshPreview();
 }
-
-function refreshInvoiceTable() { $('list').innerHTML = customersTableHTML(); }
-function refreshRekapTable() { $('rekap').innerHTML = rekapTableHTML(); }
 
 // ---------- cetak ----------
 // Thermal: gulungan kertas tidak punya tinggi tetap, jadi setiap struk diukur
@@ -632,7 +758,7 @@ function setViews() {
   $('filters').disabled = !CONVERTED;
   $('filter-hint').hidden = CONVERTED;
   $('btn-convert').disabled = !has || CONVERTED;
-  $('btn-convert').textContent = CONVERTED ? 'Sudah dikonversi' : 'Convert to Invoice';
+  $('btn-convert').querySelector('span').textContent = CONVERTED ? 'Sudah dikonversi' : 'Convert to Invoice';
   $('btn-reset').hidden = !has;
 }
 
@@ -670,6 +796,8 @@ function paintMetode() {
 
 function fillFilterOptions() {
   METODE_SEL = '';
+  PAGE.invoice = PAGE.rekap = 1;
+  LAST_SIG = '';
   $('q').value = '';
   paintMetode();
 }
@@ -781,24 +909,13 @@ $('paper').addEventListener('change', e => {
   if (SELECTED) refreshPreview();
 });
 
-// Delegasi: toggle baris & aksi tabel
-function onTableClick(e, refresh) {
-  const t = e.target.closest('[data-toggle]');
-  if (t) {
-    const id = t.dataset.toggle;
-    if (EXPANDED.has(id)) EXPANDED.delete(id); else EXPANDED.add(id);
-    refresh();
-    return;
-  }
-  const pv = e.target.closest('[data-preview]');
-  if (pv) return showPreview(pv.dataset.preview);
-  const one = e.target.closest('[data-print-one]');
-  if (one) return doPrint(INVOICES.filter(i => i.key === one.dataset.printOne));
-  const per = e.target.closest('[data-print-person]');
-  if (per) return doPrint(INVOICES.filter(i => i.person === per.dataset.printPerson));
-}
-$('list').addEventListener('click', e => onTableClick(e, refreshInvoiceTable));
-$('rekap').addEventListener('click', e => onTableClick(e, refreshRekapTable));
+// Tabel: toggle, aksi, dan paginasi
+$('list').addEventListener('click', onTableClick);
+$('rekap').addEventListener('click', onTableClick);
+$('pg-invoice').addEventListener('click', onPager);
+$('pg-rekap').addEventListener('click', onPager);
+$('pg-invoice').addEventListener('change', onPageSize);
+$('pg-rekap').addEventListener('change', onPageSize);
 
 // Modal
 document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeModal));

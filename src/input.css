@@ -26,17 +26,43 @@
     @apply bg-white text-gray-900 shadow-sm;
   }
 
-  /* tombol kecil */
-  .btn-sm {
-    @apply h-8 rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40;
+  /* tombol: ikon + label, animasi tekan dan hover */
+  .btn {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-medium transition-all duration-150 ease-out active:scale-95 disabled:pointer-events-none disabled:opacity-40;
+  }
+  .btn svg {
+    @apply transition-transform duration-200 ease-out;
+  }
+  .btn:hover svg {
+    transform: translateX(2px);
+  }
+  .btn:hover:not(:disabled) {
+    @apply -translate-y-px shadow-md;
+  }
+  .btn-ghost {
+    @apply border border-gray-300 bg-white text-gray-800 hover:border-gray-400 hover:bg-gray-50;
+  }
+  .btn-primary {
+    @apply bg-accent-600 text-white shadow-sm hover:bg-accent-700;
+  }
+  .btn-dark {
+    @apply bg-gray-900 text-white shadow-sm hover:bg-black;
+  }
+  .btn-ghost:hover:not(:disabled) svg {
+    @apply text-accent-600;
+  }
+
+  /* pil metode */
+  .pill {
+    @apply inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium;
   }
 
   /* toggle expand */
   .toggle {
-    @apply grid h-7 w-7 place-items-center rounded-md text-gray-500 transition hover:bg-gray-200/70 hover:text-gray-900;
+    @apply grid h-7 w-7 place-items-center rounded-md text-gray-500 transition-all duration-150 hover:scale-110 hover:bg-gray-200/70 hover:text-gray-900 active:scale-95;
   }
   .chev {
-    @apply h-4 w-4 transition-transform duration-150;
+    @apply h-4 w-4 transition-transform duration-200 ease-out;
   }
   .toggle[aria-expanded="true"] .chev {
     transform: rotate(90deg);
@@ -49,17 +75,100 @@
   table.dt thead th {
     @apply sticky top-0 z-[1] whitespace-nowrap border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500;
   }
+  table.dt thead th.num,
+  table.dt thead th.act-h {
+    text-align: right;
+  }
   table.dt td {
     @apply px-3 py-2.5 align-middle;
   }
-  table.dt tbody tr.grp {
-    @apply border-t border-gray-200 bg-white transition hover:bg-gray-50;
-  }
-  table.dt tbody tr.sub {
-    @apply border-t border-gray-100 bg-gray-50/70 text-xs text-gray-700;
-  }
-  table.dt .num {
+  table.dt td.num {
     @apply text-right tabular-nums;
+  }
+  table.dt td.act {
+    @apply whitespace-nowrap text-right;
+  }
+  table.dt td.act .btn + .btn {
+    @apply ml-1.5;
+  }
+  /* level 1: customer (putih), produk (indigo), warna (zamrud) */
+  table.dt tbody tr.grp {
+    @apply border-t border-gray-200 bg-white transition-colors duration-150 hover:bg-gray-50;
+  }
+  table.dt tbody tr.grp.open > td:first-child {
+    box-shadow: inset 3px 0 0 #4f46e5;
+  }
+  table.dt tbody tr.lvl1 {
+    @apply border-t border-indigo-100 bg-indigo-50/70 text-[13px] text-gray-800 transition-colors duration-150 hover:bg-indigo-100/70;
+  }
+  table.dt tbody tr.lvl1 > td:first-child {
+    padding-left: 2.5rem;
+    box-shadow: inset 3px 0 0 #818cf8;
+  }
+  table.dt tbody tr.lvl2 {
+    @apply bg-emerald-50/70 text-xs text-emerald-900 transition-colors duration-150 hover:bg-emerald-100/70;
+  }
+  table.dt tbody tr.lvl2 > td:nth-child(2) {
+    padding-left: 3.25rem;
+    box-shadow: none;
+  }
+  table.dt tbody tr.lvl2 > td:first-child {
+    box-shadow: inset 3px 0 0 #34d399;
+  }
+
+  /* animasi buka (anak baru muncul) dan tutup */
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes row-out {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-6px); }
+  }
+  table.dt tbody tr.anim > td {
+    animation: row-in 260ms ease-out both;
+    animation-delay: var(--d, 0ms);
+  }
+  table.dt tbody tr.closing > td {
+    animation: row-out 200ms ease-in both;
+  }
+
+  /* paginasi */
+  .pager {
+    @apply flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-5 py-3 text-xs text-gray-600;
+  }
+  .pager-info b {
+    @apply font-semibold text-gray-900;
+  }
+  .pager-mid {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .pager-ctrl {
+    @apply inline-flex h-8 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-800 transition-all duration-150 active:scale-95 hover:-translate-y-px hover:border-accent-500 hover:text-accent-700 hover:shadow-sm disabled:pointer-events-none disabled:opacity-40;
+  }
+  .pager-ctrl svg {
+    @apply h-3.5 w-3.5 transition-transform duration-200;
+  }
+  .pager-ctrl:hover:not(:disabled) svg {
+    transform: scale(1.15);
+  }
+  .pager-nums {
+    @apply flex items-center gap-1;
+  }
+  .pg-num {
+    @apply grid h-8 min-w-[2rem] place-items-center rounded-lg px-2 text-xs font-medium tabular-nums text-gray-700 transition-all duration-150 active:scale-95 hover:bg-gray-100;
+  }
+  .pg-num.pg-on {
+    @apply bg-accent-600 text-white shadow-sm hover:bg-accent-700;
+  }
+  .pager-gap {
+    @apply px-1 text-gray-400;
+  }
+  .pager-size {
+    @apply inline-flex items-center gap-2;
+  }
+  .pager-size select {
+    @apply h-8 rounded-lg border border-gray-300 bg-white px-2 text-xs transition hover:border-gray-400 focus:border-accent-600 focus:outline-none focus:ring-[3px] focus:ring-accent-200;
   }
 
   /* ---------- sheet invoice (layar & cetak) ---------- */

@@ -2,7 +2,7 @@
 
 Aplikasi statis untuk membaca ekspor order berdu.id (dengan harga) dan template gudang (tanpa harga), lalu:
 
-- menampilkan ringkasan dan filter (status, metode pengiriman, tanggal, kata kunci),
+- menampilkan ringkasan dan filter (metode pengiriman dan pencarian nama),
 - membuat **rekap produk** per produk dan warna, untuk daftar ambil barang,
 - membuat **satu invoice per produk** untuk setiap customer, dengan rincian warna dan qty,
 - mencetak invoice dalam ukuran A5.
