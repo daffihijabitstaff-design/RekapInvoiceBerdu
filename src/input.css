@@ -20,7 +20,7 @@
 @layer components {
   /* segmented control (tab & filter metode) */
   .seg-btn {
-    @apply h-8 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-medium text-gray-600 transition hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex h-8 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-medium text-gray-600 transition hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .seg-on {
     @apply bg-white text-gray-900 shadow-sm;

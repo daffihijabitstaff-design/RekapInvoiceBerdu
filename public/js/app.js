@@ -349,7 +349,7 @@ let LAST_SIG = '';
 let BUSY = false;
 
 const animCls = parent => JUST.has(parent) ? ' anim' : '';
-const fx = (parent, i) => JUST.has(parent) ? ` style="--d:${i * 35}ms"` : '';
+const fx = (parent, i) => JUST.has(parent) ? ` style="--d:${Math.min(i, 6) * 30}ms"` : '';
 
 // ---------- tabel: render ----------
 function invoiceTableHTML(rows, price) {
@@ -443,30 +443,28 @@ function pageSlice(tab, items) {
   return { rows: items.slice(start, start + size), cur: PAGE[tab], pages, start, total: items.length };
 }
 
-function pagerHTML(tab, info, label) {
+function pagerHTML(tab, info) {
   if (!info.total) return '';
   const { cur, pages, start, total } = info;
   const end = Math.min(start + SIZE[tab], total);
-  const ctrl = (n, disabled, ic, text, left) => {
-    const inner = left ? icon(ic) + `<span>${text}</span>` : `<span>${text}</span>` + icon(ic);
-    return `<button type="button" class="pager-ctrl" data-page="${tab}:${n}" ${disabled ? 'disabled' : ''} aria-label="${text}">${inner}</button>`;
-  };
+  const ctrl = (n, disabled, ic, label) => `<button type="button" class="pager-ctrl w-8 justify-center px-0" data-page="${tab}:${n}" ${disabled ? 'disabled' : ''} aria-label="${label}" title="${label}">${icon(ic)}</button>`;
   const nums = pageNums(cur, pages).map(n => n === '…'
     ? '<span class="pager-gap" aria-hidden="true">…</span>'
     : `<button type="button" class="pg-num${n === cur ? ' pg-on' : ''}" data-page="${tab}:${n}"${n === cur ? ' aria-current="page"' : ''}>${n}</button>`).join('');
   return `<nav class="pager" aria-label="Navigasi halaman">
-    <div class="pager-info">Menampilkan <b>${start + 1}–${end}</b> dari <b>${total}</b> ${label}</div>
+    <div class="pager-info">Menampilkan <b>${start + 1}–${end}</b> dari <b>${total}</b> ${tab === 'invoice' ? 'customer' : 'produk'}</div>
     <div class="pager-mid">
-      ${ctrl(1, cur <= 1, 'chevsL', 'Awal', true)}
-      ${ctrl(cur - 1, cur <= 1, 'chevL', 'Sebelumnya', true)}
+      ${ctrl(cur - 1, cur <= 1, 'chevL', 'Halaman sebelumnya')}
       <div class="pager-nums">${nums}</div>
-      ${ctrl(cur + 1, cur >= pages, 'chevR', 'Berikutnya', false)}
-      ${ctrl(pages, cur >= pages, 'chevsR', 'Akhir', false)}
+      ${ctrl(cur + 1, cur >= pages, 'chevR', 'Halaman berikutnya')}
     </div>
-    <label class="pager-size">Per halaman
-      <select data-pagesize="${tab}">${[10, 25, 50].map(n => `<option value="${n}"${n === SIZE[tab] ? ' selected' : ''}>${n}</option>`).join('')}</select>
-    </label>
   </nav>`;
+}
+
+function sizeHTML(tab) {
+  return `<label class="pager-size">Baris per halaman
+    <select data-pagesize="${tab}">${[10, 25, 50].map(n => `<option value="${n}"${n === SIZE[tab] ? ' selected' : ''}>${n}</option>`).join('')}</select>
+  </label>`;
 }
 
 function renderTables() {
@@ -475,11 +473,13 @@ function renderTables() {
 
   const inv = pageSlice('invoice', PERSONS);
   $('list').innerHTML = inv.total ? invoiceTableHTML(inv.rows, price) : emptyHTML('Tidak ada data sesuai filter.');
-  $('pg-invoice').innerHTML = pagerHTML('invoice', inv, 'customer');
+  $('sz-invoice').innerHTML = sizeHTML('invoice');
+  $('pg-invoice').innerHTML = pagerHTML('invoice', inv);
 
   const rk = pageSlice('rekap', REKAP);
   $('rekap').innerHTML = rk.total ? rekapTableHTML(rk.rows, split) : emptyHTML('Tidak ada data sesuai filter.');
-  $('pg-rekap').innerHTML = pagerHTML('rekap', rk, 'produk');
+  $('sz-rekap').innerHTML = sizeHTML('rekap');
+  $('pg-rekap').innerHTML = pagerHTML('rekap', rk);
 
   JUST.clear();
 }
@@ -628,7 +628,6 @@ function renderAll() {
   const pcs = sum(list.flatMap(o => o.items).map(i => i.qty));
   $('st-orders').textContent = list.length;
   $('st-cust').textContent = PERSONS.length;
-  $('st-items').textContent = sum(list.map(o => o.items.length));
   $('st-invoices').textContent = INVOICES.length;
   if (FORMAT === 'gudang') {
     $('st-total-label').textContent = 'Total pcs';
@@ -767,11 +766,16 @@ function updateSummary() {
   $('fname').textContent = has ? FILE_NAME : 'Belum ada file.';
   $('fmt').textContent = !has ? 'Belum ada data'
     : FORMAT === 'gudang' ? 'Template gudang (tanpa harga)' : 'Ekspor berdu.id (dengan harga)';
+  if (!CONVERTED) {
+    ['st-orders', 'st-cust', 'st-invoices', 'st-total'].forEach(id => $(id).textContent = '–');
+    $('st-total-label').textContent = 'Total';
+    $('sum-warn').hidden = true;
+    return;
+  }
   const pcs = sum(ALL.flatMap(o => o.items).map(i => i.qty));
   const persons = new Set(ALL.map(o => normName(o.reseller || o.buyer))).size;
   $('st-orders').textContent = ALL.length;
   $('st-cust').textContent = persons;
-  $('st-items').textContent = sum(ALL.map(o => o.items.length));
   $('st-invoices').textContent = has ? buildInvoices(ALL).length : 0;
   if (FORMAT === 'gudang') {
     $('st-total-label').textContent = 'Total pcs';
@@ -914,8 +918,8 @@ $('list').addEventListener('click', onTableClick);
 $('rekap').addEventListener('click', onTableClick);
 $('pg-invoice').addEventListener('click', onPager);
 $('pg-rekap').addEventListener('click', onPager);
-$('pg-invoice').addEventListener('change', onPageSize);
-$('pg-rekap').addEventListener('change', onPageSize);
+$('sz-invoice').addEventListener('change', onPageSize);
+$('sz-rekap').addEventListener('change', onPageSize);
 
 // Modal
 document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeModal));

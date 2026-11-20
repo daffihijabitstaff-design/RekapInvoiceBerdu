@@ -75,7 +75,8 @@
             <span>Cetak semua</span>
           </button>
         </div>
-        <div id="list" class="max-h-[62vh] overflow-auto"></div>
+        <div id="sz-invoice" class="flex justify-end border-b border-gray-200 px-5 py-2.5"></div>
+        <div id="list"></div>
         <div id="pg-invoice"></div>
       </div>
 
@@ -88,14 +89,15 @@
             <span>Cetak rekap</span>
           </button>
         </div>
-        <div id="rekap" class="max-h-[62vh] overflow-auto"></div>
+        <div id="sz-rekap" class="flex justify-end border-b border-gray-200 px-5 py-2.5"></div>
+        <div id="rekap"></div>
         <div id="pg-rekap"></div>
       </div>
     </section>
   </main>
 
   <!-- ============ SIDEBAR KANAN ============ -->
-  <aside class="flex w-full shrink-0 flex-col gap-6 border-t border-gray-200 bg-white p-5 lg:sticky lg:top-0 lg:h-screen lg:w-[320px] lg:overflow-auto lg:border-l lg:border-t-0">
+  <aside class="flex w-full shrink-0 flex-col gap-6 border-t border-gray-200 bg-white p-5 lg:sticky lg:top-0 lg:h-screen lg:w-[340px] lg:overflow-auto lg:border-l lg:border-t-0">
 
     <section>
       <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Ringkasan</h3>
@@ -112,15 +114,11 @@
           <div class="text-xs text-gray-500">Customer</div>
         </div>
         <div class="rounded-lg border border-gray-200 p-3">
-          <div id="st-items" class="text-xl font-semibold tabular-nums">0</div>
-          <div class="text-xs text-gray-500">Baris produk</div>
-        </div>
-        <div class="rounded-lg border border-gray-200 p-3">
           <div id="st-invoices" class="text-xl font-semibold tabular-nums">0</div>
           <div class="text-xs text-gray-500">Invoice</div>
         </div>
-        <div class="col-span-2 rounded-lg border border-gray-200 p-3">
-          <div id="st-total" class="text-xl font-semibold tabular-nums">Rp 0</div>
+        <div class="rounded-lg border border-gray-200 p-3">
+          <div id="st-total" class="truncate text-lg font-semibold tabular-nums">Rp 0</div>
           <div id="st-total-label" class="text-xs text-gray-500">Total</div>
         </div>
       </div>
