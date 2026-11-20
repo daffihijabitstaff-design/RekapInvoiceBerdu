@@ -63,8 +63,8 @@ flowchart TD
    - Untuk gudang: order yang punya resi dihitung di catatan customer.
 4. **Filter.** Pakai status, metode pengiriman, rentang tanggal, atau kata kunci (nama, produk, SKU, resi). Semua ringkasan dan rekap ikut berubah sesuai filter.
 5. **Rekap produk.** Tabel per produk dan variasi dengan total qty, dipisah antara gudang pusat dan dropship untuk format gudang. Cetak rekap ini sebagai daftar ambil barang.
-6. **Invoice per customer.** Pilih customer, periksa alamat, telepon, dan catatan. Isi alamat dan telepon di form jika tidak ada di file. Isian manual disimpan di browser dan menang atas data file.
-7. **Cetak.** A5 portrait, satu customer per halaman. "Cetak semua" mencetak seluruh hasil filter.
+6. **Invoice per customer.** Satu invoice berisi semua produk milik customer (per metode pengiriman), diurut nama produk. Produk yang sama dalam satu invoice hanya ditulis di baris pertama. Pilih customer, periksa alamat, telepon, dan catatan. Isi alamat dan telepon di form jika tidak ada di file. Isian manual disimpan di browser dan menang atas data file.
+7. **Cetak.** A5 portrait, satu customer per halaman. "Cetak semua" mencetak seluruh hasil filter, dengan invoice yang pendek (sedikit baris) dicetak lebih dulu, baru yang panjang.
 8. **Verifikasi resi.** Nomor resi di catatan (SPXID…, JY…, JZ…, SP…) dicocokkan dengan label kurir sebelum paket diserahkan.
 
 ### A.5 Penanganan pengecualian
