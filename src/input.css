@@ -22,6 +22,9 @@
   .seg-btn {
     @apply inline-flex h-8 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-medium text-gray-600 transition hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40;
   }
+  .seg-btn svg {
+    @apply h-3.5 w-3.5 shrink-0;
+  }
   .seg-on {
     @apply bg-white text-gray-900 shadow-sm;
   }
