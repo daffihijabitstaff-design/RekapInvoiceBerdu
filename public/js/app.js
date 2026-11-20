@@ -66,7 +66,6 @@ function parseDate(s) {
   return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
 }
 const fmtDate = d => d ? `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` : '-';
-const ymdCompact = d => d ? `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}` : 'NA';
 // Ambil nilai warna saja (WARNA:BLACK -> BLACK). Atribut lain tetap ditampilkan.
 const fmtWarna = v => {
   if (!v) return '—';
@@ -381,66 +380,39 @@ function filteredOrders() {
 }
 
 // ---------- pengelompokan ----------
-// Indeks tetap dari SEMUA order (tidak ikut filter), supaya nomor invoice tidak berubah saat filter dipakai
-function fullIndex() {
-  const units = new Map();
-  for (const o of ALL) {
-    const raw = o.reseller || o.buyer || '(tanpa nama)';
-    const person = normName(raw) || '(tanpa nama)';
-    const metode = o.metode || '';
-    const key = person + '|' + metode;
-    if (!units.has(key)) units.set(key, { person, metode, name: raw.trim().replace(/\s+/g, ' '), orders: [], items: [] });
-    const u = units.get(key);
-    u.orders.push(o);
-    u.items.push(...o.items);
-  }
-  const sorted = [...units.values()].sort((a, b) => a.name.localeCompare(b.name) || a.metode.localeCompare(b.metode));
-  const idx = new Map();
-  sorted.forEach((u, ui) => {
-    const first = u.orders.map(o => o.sent).filter(Boolean).sort((a, b) => a - b)[0] || null;
-    idx.set(u.person + '|' + u.metode, { no: ui + 1, first });
-  });
-  return idx;
-}
-
-// Satu invoice per customer dan metode pengiriman. Semua produk ada di dalam satu invoice, diurut nama produk.
+// Satu invoice per Order ID. Nomor invoice = Order ID.
+// Produk dalam satu order digabung per nama produk dan diurut nama produk.
+// Order tanpa baris produk tidak menghasilkan invoice.
 function buildInvoices(list) {
-  const full = fullIndex();
-  const units = new Map();
-  for (const o of list) {
-    const raw = o.reseller || o.buyer || '(tanpa nama)';
-    const person = normName(raw) || '(tanpa nama)';
-    const metode = o.metode || '';
-    const key = person + '|' + metode;
-    if (!units.has(key)) units.set(key, { person, metode, name: raw.trim().replace(/\s+/g, ' '), orders: [], items: [] });
-    const u = units.get(key);
-    u.orders.push(o);
-    u.items.push(...o.items);
-  }
-  const sorted = [...units.values()].sort((a, b) => a.name.localeCompare(b.name) || a.metode.localeCompare(b.metode));
   const out = [];
-  for (const u of sorted) {
-    const f = full.get(u.person + '|' + u.metode);
-    const groups = productGroups(u.items);           // sudah diurut nama produk
+  for (const o of list) {
+    if (!o.items.length) continue;
+    const groups = productGroups(o.items);
+    const raw = o.reseller || o.buyer || '(tanpa nama)';
     out.push({
-      key: u.person + '|' + u.metode,
-      person: u.person, name: u.name, metode: u.metode, metodeLabel: metodeShort(u.metode),
-      pickup: u.metode || 'Metode belum diisi',
-      first: f.first,
-      invNo: `INV/${ymdCompact(f.first)}/${String(f.no).padStart(3, '0')}`,
+      key: o.id,
+      invNo: o.id,
+      person: normName(raw) || '(tanpa nama)',
+      name: raw.trim().replace(/\s+/g, ' '),
+      metode: o.metode || '',
+      metodeLabel: metodeShort(o.metode || ''),
+      pickup: o.metode || 'Metode belum diisi',
+      first: o.sent,
       groups,                                        // produk, masing-masing berisi warna
-      lines: sum(groups.map(g => g.colors.length)),  // jumlah baris tabel di invoice (dipakai untuk urutan cetak)
+      lines: sum(groups.map(g => g.colors.length)),  // jumlah baris tabel invoice (dipakai untuk urutan cetak)
       pcs: sum(groups.map(g => g.qty)),
       sub: sum(groups.map(g => g.sub)),
-      orderIds: [...new Set(u.orders.map(o => o.id))],
-      resi: [...new Set(u.orders.flatMap(o => o.resi))],
-      notes: [...new Set(u.orders.map(o => o.note).filter(Boolean))],
-      orders: u.orders,
-      mismatch: u.orders.some(o => o.mismatch),
-      discount: sum(u.orders.map(o => o.discount)) > 0,
+      orderIds: [o.id],
+      resi: [...o.resi],
+      notes: o.note ? [o.note] : [],
+      orders: [o],
+      mismatch: o.mismatch,
+      discount: o.discount > 0,
     });
   }
-  return out;
+  // urut nama customer, lalu metode, lalu Order ID
+  return out.sort((x, y) => x.name.localeCompare(y.name) || x.metode.localeCompare(y.metode)
+    || String(x.key).localeCompare(String(y.key), undefined, { numeric: true }));
 }
 
 // Customer = gabungan invoice produk dengan nama yang sama
@@ -733,7 +705,6 @@ function invoiceHTML(inv) {
       ${created ? `<dt>Waktu order</dt><dd>${esc(created)}</dd>` : ''}
       <dt>Kepada</dt><dd><b>${esc(inv.name)}</b></dd>
       <dt>Pengiriman</dt><dd>${esc(inv.pickup)}</dd>
-      <dt>Order ID</dt><dd>${inv.orderIds.map(esc).join(', ')}</dd>
       ${inv.resi.length ? `<dt>Resi</dt><dd>${inv.resi.map(esc).join('<br>')}</dd>` : ''}
     </dl>
     ${inv.notes.length ? `<div class="inv-note"><b>Catatan:</b> ${inv.notes.map(esc).join(' | ')}</div>` : ''}
