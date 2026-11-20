@@ -733,7 +733,7 @@ function invoiceHTML(inv) {
       <dt>Tanggal</dt><dd>${fmtDate(inv.first)}</dd>
       ${created ? `<dt>Waktu order</dt><dd>${esc(created)}</dd>` : ''}
       <dt>Kepada</dt><dd><b>${esc(inv.name)}</b></dd>
-      <dt>Ambil</dt><dd>${esc(inv.pickup)}</dd>
+      <dt>Pengiriman</dt><dd>${esc(inv.pickup)}</dd>
       <dt>Order ID</dt><dd>${inv.orderIds.map(esc).join(', ')}</dd>
       ${inv.resi.length ? `<dt>Resi</dt><dd>${inv.resi.map(esc).join('<br>')}</dd>` : ''}
     </dl>
@@ -756,7 +756,6 @@ function invoiceHTML(inv) {
     ${inv.mismatch ? '<div class="inv-small">Total di file berbeda dari subtotal − diskon.</div>' : ''}
     <hr class="sep">
     <div class="inv-foot">Bagian ${inv.part} dari ${inv.partTotal} untuk ${esc(inv.name)}</div>
-    <div class="inv-foot strong">Terima kasih atas pesanan Anda.</div>
   </article>`;
 }
 
