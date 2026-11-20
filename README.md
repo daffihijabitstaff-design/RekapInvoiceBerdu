@@ -4,7 +4,7 @@ Aplikasi statis untuk membaca ekspor order berdu.id (dengan harga) dan template 
 
 - menampilkan ringkasan dan filter (metode pengiriman dan pencarian nama),
 - membuat **rekap produk** per produk dan warna, untuk daftar ambil barang,
-- membuat **satu invoice per customer** (dipisah per metode pengiriman) dengan semua produk diurut nama produk, lengkap dengan warna dan qty,
+- membuat **satu invoice per Order ID** (nomor invoice = Order ID) dengan semua produk diurut nama produk, lengkap dengan warna dan qty,
 - mencetak invoice dalam ukuran A5 atau thermal, dengan invoice pendek dicetak lebih dulu.
 
 Semua proses terjadi di browser. File tidak diunggah ke server.
