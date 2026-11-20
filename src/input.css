@@ -227,12 +227,6 @@
   .inv-sheet .inv-note {
     @apply mt-2 rounded border border-gray-300 bg-gray-50 px-2 py-1 text-[0.95em];
   }
-  .inv-sheet .inv-part {
-    @apply text-[0.9em] font-semibold uppercase tracking-wider text-gray-500;
-  }
-  .inv-sheet .inv-prod {
-    @apply mt-0.5 text-[1.25em] font-bold leading-tight;
-  }
   .inv-sheet table.inv-tbl {
     @apply mt-2 w-full border-collapse;
   }
@@ -241,6 +235,13 @@
   }
   .inv-sheet table.inv-tbl td {
     @apply border-b border-dotted border-gray-400 py-1 align-top;
+  }
+  /* invoice: garis solid di setiap baris agar mudah diikuti saat dicetak */
+  .inv-sheet table.inv-lines td {
+    @apply border-b border-solid border-gray-500 py-1.5;
+  }
+  .inv-sheet table.inv-lines td.inv-prod-cell {
+    @apply pr-2;
   }
   .inv-sheet table.inv-tbl tfoot td {
     @apply border-b-0 border-t border-gray-900 pt-1.5 font-bold;
