@@ -397,15 +397,13 @@ function fullIndex() {
   const sorted = [...units.values()].sort((a, b) => a.name.localeCompare(b.name) || a.metode.localeCompare(b.metode));
   const idx = new Map();
   sorted.forEach((u, ui) => {
-    const groups = productGroups(u.items);
-    const parts = new Map(groups.map((g, gi) => [g.prod, { part: gi + 1, total: groups.length }]));
     const first = u.orders.map(o => o.sent).filter(Boolean).sort((a, b) => a - b)[0] || null;
-    idx.set(u.person + '|' + u.metode, { no: ui + 1, first, parts });
+    idx.set(u.person + '|' + u.metode, { no: ui + 1, first });
   });
   return idx;
 }
 
-// Satu invoice per produk, per customer dan metode pengiriman
+// Satu invoice per customer dan metode pengiriman. Semua produk ada di dalam satu invoice, diurut nama produk.
 function buildInvoices(list) {
   const full = fullIndex();
   const units = new Map();
@@ -423,25 +421,24 @@ function buildInvoices(list) {
   const out = [];
   for (const u of sorted) {
     const f = full.get(u.person + '|' + u.metode);
-    for (const g of productGroups(u.items)) {
-      const pi = f.parts.get(g.prod);
-      const orders = u.orders.filter(o => o.items.some(i => i.prod.trim().toUpperCase() === g.prod));
-      out.push({
-        key: u.person + '|' + u.metode + '|' + g.prod,
-        person: u.person, name: u.name, metode: u.metode, metodeLabel: metodeShort(u.metode),
-        pickup: u.metode || 'Metode belum diisi',
-        first: f.first,
-        invNo: `INV/${ymdCompact(f.first)}/${String(f.no).padStart(3, '0')}-P${pi.part}`,
-        prod: g.prod, part: pi.part, partTotal: pi.total,
-        colors: g.colors, pcs: g.qty, sub: g.sub,
-        orderIds: g.orderIds,
-        resi: [...new Set(orders.flatMap(o => o.resi))],
-        notes: [...new Set(orders.map(o => o.note).filter(Boolean))],
-        orders,
-        mismatch: orders.some(o => o.mismatch),
-        discount: sum(orders.map(o => o.discount)) > 0,
-      });
-    }
+    const groups = productGroups(u.items);           // sudah diurut nama produk
+    out.push({
+      key: u.person + '|' + u.metode,
+      person: u.person, name: u.name, metode: u.metode, metodeLabel: metodeShort(u.metode),
+      pickup: u.metode || 'Metode belum diisi',
+      first: f.first,
+      invNo: `INV/${ymdCompact(f.first)}/${String(f.no).padStart(3, '0')}`,
+      groups,                                        // produk, masing-masing berisi warna
+      lines: sum(groups.map(g => g.colors.length)),  // jumlah baris tabel di invoice (dipakai untuk urutan cetak)
+      pcs: sum(groups.map(g => g.qty)),
+      sub: sum(groups.map(g => g.sub)),
+      orderIds: [...new Set(u.orders.map(o => o.id))],
+      resi: [...new Set(u.orders.flatMap(o => o.resi))],
+      notes: [...new Set(u.orders.map(o => o.note).filter(Boolean))],
+      orders: u.orders,
+      mismatch: u.orders.some(o => o.mismatch),
+      discount: sum(u.orders.map(o => o.discount)) > 0,
+    });
   }
   return out;
 }
@@ -538,20 +535,20 @@ function invoiceTableHTML(rows, price) {
       const po = EXPANDED.has(pid);
       h += `<tr class="lvl1${animCls(id)}" data-parent="${esc(id)}" data-row="${esc(pid)}"${fx(id, i)}>
         <td>${toggleBtn(pid, po)}</td>
-        <td><div class="font-medium text-gray-900">${esc(inv.prod)}</div><div class="text-[11px] text-gray-500">Part ${inv.part} dari ${inv.partTotal} · ${esc(inv.invNo)}</div></td>
+        <td><div class="font-medium text-gray-900">${esc(inv.invNo)}</div><div class="text-[11px] text-gray-500">${inv.groups.length} produk · ${inv.lines} baris</div></td>
         <td class="hidden md:table-cell"><span class="pill ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
         <td></td>
         <td class="num">${inv.pcs}</td>
         ${price ? `<td class="num">${rp(inv.sub)}</td>` : ''}
         <td class="act">${btn('ghost', 'eye', 'Preview', `data-preview="${esc(inv.key)}"`)}${btn('dark', 'printer', 'Cetak', `data-print-one="${esc(inv.key)}"`)}</td>
       </tr>`;
-      if (po) inv.colors.forEach((c, j) => {
+      if (po) inv.groups.forEach((g, j) => {
         h += `<tr class="lvl2${animCls(pid)}" data-parent="${esc(pid)}"${fx(pid, j)}>
           <td></td>
-          <td>${esc(c.warna)}${price && c.price !== null ? ` <span class="text-gray-400">· ${rp(c.price)}</span>` : ''}</td>
+          <td><div class="font-medium">${esc(g.prod)}</div><div class="text-[11px] text-emerald-700">${g.colors.map(c => `${esc(c.warna)} ${c.qty}x`).join(' · ')}</div></td>
           <td></td><td></td>
-          <td class="num">${c.qty}x</td>
-          ${price ? `<td class="num">${rp(c.sub)}</td>` : ''}
+          <td class="num">${g.qty}x</td>
+          ${price ? `<td class="num">${rp(g.sub)}</td>` : ''}
           <td></td>
         </tr>`;
       });
@@ -713,13 +710,15 @@ function invoiceHTML(inv) {
   const narrow = PAPER === 'thermal58';
   const ekspor = FORMAT === 'ekspor';
   const showHarga = ekspor && !narrow;
-  const head = `<tr><th>Warna</th><th class="num">Qty</th>${showHarga ? '<th class="num">Harga</th>' : ''}${ekspor ? '<th class="num">Subtotal</th>' : ''}</tr>`;
-  const rows = inv.colors.map(c => `<tr>
+  const head = `<tr><th>Produk</th><th>Warna</th><th class="num">Qty</th>${showHarga ? '<th class="num">Harga</th>' : ''}${ekspor ? '<th class="num">Subtotal</th>' : ''}</tr>`;
+  // Produk yang sama hanya ditulis di baris pertama; baris warna berikutnya dikosongkan di kolom produk
+  const rows = inv.groups.map(g => g.colors.map((c, j) => `<tr>
+      <td class="inv-prod-cell">${j === 0 ? `<b>${esc(g.prod)}</b>` : ''}</td>
       <td>${esc(c.warna)}</td>
       <td class="num">${c.qty}x</td>
       ${showHarga ? `<td class="num">${c.price === null ? '—' : rp(c.price)}</td>` : ''}
       ${ekspor ? `<td class="num">${rp(c.sub)}</td>` : ''}
-    </tr>`).join('');
+    </tr>`).join('')).join('');
   const created = inv.orders[0] ? inv.orders[0].created : '';
   return `
   <article class="inv-sheet ${cls}">
@@ -739,13 +738,11 @@ function invoiceHTML(inv) {
     </dl>
     ${inv.notes.length ? `<div class="inv-note"><b>Catatan:</b> ${inv.notes.map(esc).join(' | ')}</div>` : ''}
     <hr class="sep">
-    <div class="inv-part">Produk ${inv.part} dari ${inv.partTotal}</div>
-    <div class="inv-prod">${esc(inv.prod)}</div>
-    <table class="inv-tbl">
+    <table class="inv-tbl inv-lines">
       <thead>${head}</thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
-        <td>Total</td>
+        <td colspan="2">Total</td>
         <td class="num">${inv.pcs}x</td>
         ${showHarga ? '<td></td>' : ''}
         ${ekspor ? `<td class="num">${rp(inv.sub)}</td>` : ''}
@@ -754,8 +751,6 @@ function invoiceHTML(inv) {
     ${ekspor ? `<div class="inv-sum"><span>Subtotal produk</span><b>${rp(inv.sub)}</b></div>` : ''}
     ${ekspor && inv.discount ? '<div class="inv-small">Order ini memakai diskon/voucher. Potongannya tidak dialokasikan per produk.</div>' : ''}
     ${inv.mismatch ? '<div class="inv-small">Total di file berbeda dari subtotal − diskon.</div>' : ''}
-    <hr class="sep">
-    <div class="inv-foot">Bagian ${inv.part} dari ${inv.partTotal} untuk ${esc(inv.name)}</div>
   </article>`;
 }
 
@@ -844,9 +839,13 @@ function preparePrint(sheetsHTML) {
   st.textContent = css;
 }
 
+// Invoice pendek (sedikit baris) dicetak dulu, baru yang panjang.
+// Array.prototype.sort stabil, jadi invoice dengan panjang sama tetap urut nama customer.
+const printOrder = list => [...list].sort((a, b) => a.lines - b.lines);
+
 function doPrint(list) {
   if (!list.length) return;
-  preparePrint(list.map(invoiceHTML).join(''));
+  preparePrint(printOrder(list).map(invoiceHTML).join(''));
   window.print();
 }
 
@@ -857,19 +856,15 @@ function printRekap() {
 }
 
 // ---------- modal preview ----------
-function siblingsOf(inv) {
-  return INVOICES.filter(x => x.person === inv.person && x.metode === inv.metode);
-}
-
+// Navigasi prev/next berjalan di seluruh daftar invoice (urutan tampilan)
 function refreshPreview() {
-  const inv = INVOICES.find(i => i.key === SELECTED);
-  if (!inv) return;
-  const sib = siblingsOf(inv);
-  const idx = sib.findIndex(x => x.key === inv.key);
-  $('pv-title').textContent = `${inv.name} · ${inv.prod}`;
-  $('pv-pos').textContent = `${inv.metodeLabel ? inv.metodeLabel + ' · ' : ''}Produk ${inv.part} dari ${inv.partTotal}`;
+  const idx = INVOICES.findIndex(i => i.key === SELECTED);
+  if (idx < 0) return;
+  const inv = INVOICES[idx];
+  $('pv-title').textContent = `${inv.name} · ${inv.invNo}`;
+  $('pv-pos').textContent = `${inv.metodeLabel ? inv.metodeLabel + ' · ' : ''}Invoice ${idx + 1} dari ${INVOICES.length}`;
   $('btn-prev').disabled = idx <= 0;
-  $('btn-next').disabled = idx >= sib.length - 1;
+  $('btn-next').disabled = idx >= INVOICES.length - 1;
   $('pv').innerHTML = invoiceHTML(inv);
   $('warn').innerHTML = '';
 }
@@ -888,10 +883,8 @@ function closeModal() {
 }
 
 function stepPreview(d) {
-  const inv = INVOICES.find(i => i.key === SELECTED);
-  if (!inv) return;
-  const sib = siblingsOf(inv);
-  const target = sib[sib.findIndex(x => x.key === inv.key) + d];
+  const idx = INVOICES.findIndex(i => i.key === SELECTED);
+  const target = idx >= 0 ? INVOICES[idx + d] : null;
   if (target) { SELECTED = target.key; refreshPreview(); }
 }
 
