@@ -900,6 +900,8 @@ function setTab(t) {
   TAB = t;
   $('pane-invoice').hidden = t !== 'invoice';
   $('pane-rekap').hidden = t !== 'rekap';
+  $('sz-invoice').hidden = t !== 'invoice';
+  $('sz-rekap').hidden = t !== 'rekap';
   document.querySelectorAll('[data-tab]').forEach(b => {
     const on = b.dataset.tab === t;
     b.classList.toggle('seg-on', on);
@@ -922,7 +924,6 @@ function setViews() {
   $('picked').hidden = !has || CONVERTED;
   $('picked-name').textContent = FILE_NAME;
   $('filters').disabled = !CONVERTED;
-  $('filter-hint').hidden = CONVERTED;
   $('btn-convert').disabled = !has || CONVERTED;
   $('btn-convert').querySelector('span').textContent = CONVERTED ? 'Sudah dikonversi' : 'Convert to Invoice';
   $('btn-reset').hidden = !has;
