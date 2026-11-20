@@ -4,7 +4,7 @@
 
 /* ---------- base ---------- */
 @layer base {
-  /* Tailwind's display utilities override the hidden attribute; keep it working */
+  /* utilitas display Tailwind menimpa atribut hidden; kembalikan perilakunya */
   [hidden] {
     display: none !important;
   }
@@ -16,141 +16,141 @@
   }
 }
 
-/* ---------- components used by JS-generated markup ---------- */
+/* ---------- komponen ---------- */
 @layer components {
-  /* customer list card */
-  .card {
-    @apply mb-2 flex items-center justify-between gap-2.5 rounded-lg border border-gray-200 bg-white p-3 transition hover:border-accent-200;
+  /* segmented control (tab & filter metode) */
+  .seg-btn {
+    @apply h-8 flex-1 whitespace-nowrap rounded-md px-3 text-xs font-medium text-gray-600 transition hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40;
   }
-  .card.sel {
-    @apply border-accent-600 bg-accent-50 shadow-[inset_3px_0_0_#4338ca];
-  }
-  .card b {
-    @apply text-[13px] font-semibold;
-  }
-  .card .r {
-    @apply flex shrink-0 flex-col items-end gap-1.5 text-right;
+  .seg-on {
+    @apply bg-white text-gray-900 shadow-sm;
   }
 
-  .muted {
-    @apply mt-0.5 text-xs text-gray-500;
-  }
-  .warn {
-    @apply mt-1 text-xs text-amber-700;
-  }
-  .warnbox {
-    @apply mb-3.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800;
-  }
-  .pill {
-    @apply mt-1 inline-block rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-600;
+  /* tombol kecil */
+  .btn-sm {
+    @apply h-8 rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40;
   }
 
-  /* ---------- invoice sheet (screen + print) ---------- */
-  .sheet {
-    @apply mx-auto w-[148mm] max-w-full bg-white p-[9mm] text-[11px] text-gray-900 shadow-sm;
+  /* toggle expand */
+  .toggle {
+    @apply grid h-7 w-7 place-items-center rounded-md text-gray-500 transition hover:bg-gray-200/70 hover:text-gray-900;
   }
-  .sheet-head {
-    @apply flex items-baseline justify-between border-b-[1.5px] border-gray-900 pb-1.5 text-[13px] font-semibold;
+  .chev {
+    @apply h-4 w-4 transition-transform duration-150;
   }
-  .inv {
-    @apply text-[10px] font-medium tracking-wide text-gray-500;
+  .toggle[aria-expanded="true"] .chev {
+    transform: rotate(90deg);
   }
-  .blk {
-    @apply border-b border-gray-200 py-2.5;
+
+  /* tabel data */
+  table.dt {
+    @apply w-full border-collapse text-sm;
   }
-  .lbl {
-    @apply mb-0.5 text-[9px] font-medium uppercase tracking-widest text-gray-500;
+  table.dt thead th {
+    @apply sticky top-0 z-[1] whitespace-nowrap border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500;
   }
-  .pickup {
-    @apply mt-0.5 font-semibold;
+  table.dt td {
+    @apply px-3 py-2.5 align-middle;
   }
-  .prod {
-    @apply mt-0.5 text-sm font-bold;
+  table.dt tbody tr.grp {
+    @apply border-t border-gray-200 bg-white transition hover:bg-gray-50;
   }
-  .part {
-    @apply mt-0.5 text-[10.5px] text-gray-700;
+  table.dt tbody tr.sub {
+    @apply border-t border-gray-100 bg-gray-50/70 text-xs text-gray-700;
   }
-  .ref {
-    @apply mt-0.5 text-[8.5px] text-gray-400;
+  table.dt .num {
+    @apply text-right tabular-nums;
   }
-  table.items {
+
+  /* ---------- sheet invoice (layar & cetak) ---------- */
+  .inv-sheet {
+    @apply mx-auto bg-white text-gray-900 shadow-sm;
+    break-inside: avoid;
+  }
+  .paper-thermal80 {
+    width: 80mm;
+    padding: 4mm;
+    font-size: 10.5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  .paper-thermal58 {
+    width: 58mm;
+    padding: 3mm;
+    font-size: 9px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  .paper-a5 {
+    width: 148mm;
+    padding: 9mm;
+    font-size: 11px;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .inv-sheet .inv-center {
+    @apply text-center;
+  }
+  .inv-sheet .inv-store {
+    @apply text-[1.3em] font-bold tracking-wide;
+  }
+  .inv-sheet .sep {
+    @apply my-2 border-0 border-t border-dashed border-gray-900;
+  }
+  .inv-sheet .inv-title-row {
+    @apply flex items-baseline justify-between gap-2;
+  }
+  .inv-sheet .inv-title {
+    @apply text-[1.2em] font-bold tracking-widest;
+  }
+  .inv-sheet .inv-no {
+    @apply text-right text-[0.95em] font-semibold;
+  }
+  .inv-sheet .inv-kv {
+    @apply mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5;
+  }
+  .inv-sheet .inv-kv dt {
+    @apply text-gray-500;
+  }
+  .inv-sheet .inv-kv dd {
+    @apply break-all;
+  }
+  .inv-sheet .inv-note {
+    @apply mt-2 rounded border border-gray-300 bg-gray-50 px-2 py-1 text-[0.95em];
+  }
+  .inv-sheet .inv-part {
+    @apply text-[0.9em] font-semibold uppercase tracking-wider text-gray-500;
+  }
+  .inv-sheet .inv-prod {
+    @apply mt-0.5 text-[1.25em] font-bold leading-tight;
+  }
+  .inv-sheet table.inv-tbl {
     @apply mt-2 w-full border-collapse;
   }
-  table.items th {
-    @apply border-b border-gray-900 px-0.5 py-1 text-left text-[9px] font-medium uppercase tracking-wider text-gray-500;
+  .inv-sheet table.inv-tbl th {
+    @apply border-b border-gray-900 py-1 text-left text-[0.9em] font-bold uppercase;
   }
-  table.items th.c {
-    @apply text-center;
+  .inv-sheet table.inv-tbl td {
+    @apply border-b border-dotted border-gray-400 py-1 align-top;
   }
-  table.items th.r {
-    @apply text-right;
+  .inv-sheet table.inv-tbl tfoot td {
+    @apply border-b-0 border-t border-gray-900 pt-1.5 font-bold;
   }
-  table.items td {
-    @apply border-b border-gray-100 px-0.5 py-1.5 align-top;
+  .inv-sheet .num {
+    @apply whitespace-nowrap text-right tabular-nums;
   }
-  table.items tfoot td {
-    @apply border-t-[1.5px] border-gray-900 pt-1.5 font-bold;
+  .inv-sheet .inv-sum {
+    @apply mt-2 flex items-baseline justify-between gap-2;
   }
-  .r {
-    @apply text-right;
+  .inv-sheet .inv-small {
+    @apply mt-1 text-[0.85em] text-gray-500;
   }
-  .c {
-    @apply text-center;
+  .inv-sheet .inv-foot {
+    @apply text-center text-[0.9em] text-gray-600;
   }
-  .n {
-    @apply text-right tabular-nums;
-  }
-
-  /* ---------- rekap table ---------- */
-  table.rekap {
-    @apply w-full border-collapse text-[13px];
-  }
-  table.rekap th,
-  table.rekap td {
-    @apply border-b border-gray-100 px-3 py-2 text-left;
-  }
-  table.rekap th {
-    @apply sticky top-0 border-b border-gray-200 bg-gray-50 text-[11px] font-semibold uppercase tracking-wider text-gray-500;
-  }
-  table.rekap tbody tr:hover {
-    @apply bg-accent-50/50;
-  }
-  table.rekap td.n,
-  table.rekap th.n {
-    @apply text-right tabular-nums;
+  .inv-sheet .inv-foot.strong {
+    @apply mt-1 font-semibold text-gray-900;
   }
 }
 
-/* ---------- print: only the invoice sheets ---------- */
-#print-area {
-  display: none;
-}
-
-@page {
-  size: A5 portrait;
-  margin: 6mm;
-}
-
-@media print {
-  body > *:not(#print-area) {
-    display: none !important;
-  }
-  #print-area {
-    display: block !important;
-  }
-  body {
-    @apply bg-white;
-  }
-  .sheet {
-    @apply m-0 w-full border-0 p-0 shadow-none;
-    page-break-after: always;
-  }
-  .sheet:last-child {
-    page-break-after: auto;
-  }
-}
-
-/* ---------- loader roket ---------- */
+/* ---------- animasi roket ---------- */
 @layer utilities {
   .rocket-bob {
     animation: rocket-bob 1.4s ease-in-out infinite;
@@ -171,4 +171,32 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .rocket-bob, .flame { animation: none; }
+}
+
+/* ---------- cetak ---------- */
+#print-area {
+  display: none;
+}
+@media print {
+  body > *:not(#print-area) {
+    display: none !important;
+  }
+  #print-area {
+    display: block !important;
+  }
+  body {
+    @apply bg-white;
+  }
+  .inv-sheet {
+    @apply m-0 shadow-none;
+  }
+  /* A5: satu customer per halaman */
+  #print-area.a5 .inv-sheet {
+    page-break-after: always;
+    break-after: page;
+  }
+  #print-area.a5 .inv-sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
 }

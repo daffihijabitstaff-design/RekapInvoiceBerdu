@@ -8,8 +8,6 @@ const RESI_RE = /\b(SPXID[0-9A-Z]+|JY\d{8,}|JZ\d{8,}|SP\d{10,}|\d{16,})\b/g;
 
 let FORMAT = 'ekspor';  // 'ekspor' | 'gudang'
 let ALL = [];           // semua order hasil parse
-let CUST = [];          // customer hasil filter (terurut)
-let SELECTED = null;    // key customer yang sedang dipreview
 
 const $ = id => document.getElementById(id);
 const sum = a => a.reduce((x, y) => x + y, 0);
@@ -174,32 +172,38 @@ function parseGudang(rows, head) {
   return orders;
 }
 
-// ---------- filter & group ----------
-const dOf = s => { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+// ---------- konfigurasi cetak & filter ----------
+const PAPER_KEY = 'berdu-inv:paper';
+const PAPERS = {
+  thermal80: { label: 'Thermal 80 mm', w: '80mm', cls: 'paper-thermal80', thermal: true },
+  thermal58: { label: 'Thermal 58 mm', w: '58mm', cls: 'paper-thermal58', thermal: true },
+  a5:        { label: 'A5',            w: '148mm', cls: 'paper-a5', thermal: false },
+};
 
-function filtered() {
-  const q = $('q').value.trim().toLowerCase();
-  const st = $('status').value, mt = $('metode').value;
-  const from = dOf($('from').value), to = dOf($('to').value);
-  if (to) to.setHours(23, 59, 59, 999);
-  return ALL.filter(o => {
-    if (st && o.status !== st) return false;
-    if (mt && o.metode !== mt) return false;
-    if (from && (!o.sent || o.sent < from)) return false;
-    if (to && (!o.sent || o.sent > to)) return false;
-    if (q) {
-      const hay = [o.id, o.buyer, o.reseller, o.note, ...o.resi,
-                   ...o.items.flatMap(i => [i.prod, i.variasi, i.sku])].join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-}
+// ---------- state ----------
+let CONVERTED = false;
+let FILE_NAME = '';
+let METODE_SEL = '';
+let PAPER = 'thermal80';
+let INVOICES = [];   // satu invoice = satu produk milik satu customer (per metode)
+let PERSONS = [];    // customer, berisi daftar invoice produk
+let REKAP = [];      // rekap per produk, berisi warna
+let SELECTED = null; // key invoice yang sedang dipreview
+let TAB = 'invoice';
+const EXPANDED = new Set(); // id baris yang sedang dibuka: "c:<person>", "p:<key>", "r:<produk>"
+const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// Label metode pendek untuk badge
+try { const v = localStorage.getItem(PAPER_KEY); if (PAPERS[v]) PAPER = v; } catch (e) { /* storage tidak tersedia */ }
+
+// ---------- helper ----------
 const metodeShort = m => /PUSAT/i.test(m) ? 'Gudang Pusat' : /DROPSHIP/i.test(m) ? 'Dropship' : '';
+const pillCls = m => /PUSAT/i.test(m)
+  ? 'bg-indigo-50 text-indigo-700'
+  : 'bg-amber-50 text-amber-700';
+const emptyHTML = t => `<div class="m-4 rounded-lg border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500">${t}</div>`;
+const toggleBtn = (id, open) => `<button type="button" class="toggle" data-toggle="${esc(id)}" aria-expanded="${open}" aria-label="Lihat detail"><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>`;
 
-// Kelompokkan item per produk, lalu per warna di dalamnya
+// Item digabung per produk; warna dijumlahkan
 function productGroups(items) {
   const map = new Map();
   for (const i of items) {
@@ -224,16 +228,30 @@ function productGroups(items) {
   }));
 }
 
-// Satu invoice = satu produk milik satu customer (per metode pengiriman).
-// Customer dengan 5 produk menghasilkan 5 invoice (P1..P5).
-function customers(list) {
+// ---------- filter order ----------
+function filteredOrders() {
+  const q = $('q').value.trim().toLowerCase();
+  return ALL.filter(o => {
+    if (METODE_SEL && o.metode !== METODE_SEL) return false;
+    if (q) {
+      const hay = [o.id, o.buyer, o.reseller, o.note, ...o.resi,
+                   ...o.items.flatMap(i => [i.prod, i.variasi, i.sku])].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// ---------- pengelompokan ----------
+// Satu invoice per produk, per customer dan metode pengiriman
+function buildInvoices(list) {
   const units = new Map();
   for (const o of list) {
     const raw = o.reseller || o.buyer || '(tanpa nama)';
     const person = normName(raw) || '(tanpa nama)';
     const metode = o.metode || '';
     const key = person + '|' + metode;
-    if (!units.has(key)) units.set(key, { key, person, metode, name: raw.trim().replace(/\s+/g, ' '), orders: [], items: [] });
+    if (!units.has(key)) units.set(key, { person, metode, name: raw.trim().replace(/\s+/g, ' '), orders: [], items: [] });
     const u = units.get(key);
     u.orders.push(o);
     u.items.push(...o.items);
@@ -242,106 +260,248 @@ function customers(list) {
   const out = [];
   sorted.forEach((u, ui) => {
     const groups = productGroups(u.items);
-    const dates = u.orders.map(o => o.sent).filter(Boolean).sort((a, b) => a - b);
-    const first = dates[0] || null;
+    const first = u.orders.map(o => o.sent).filter(Boolean).sort((a, b) => a - b)[0] || null;
     groups.forEach((g, gi) => {
       const orders = u.orders.filter(o => o.items.some(i => i.prod.trim().toUpperCase() === g.prod));
       out.push({
-        key: u.key + '|' + g.prod,
-        person: u.person, name: u.name, metode: u.metode,
-        metodeLabel: metodeShort(u.metode),
+        key: u.person + '|' + u.metode + '|' + g.prod,
+        person: u.person, name: u.name, metode: u.metode, metodeLabel: metodeShort(u.metode),
         pickup: u.metode || SENDER.pickup,
         first,
         invNo: `INV/${ymdCompact(first)}/${String(ui + 1).padStart(3, '0')}-P${gi + 1}`,
         prod: g.prod, part: gi + 1, partTotal: groups.length,
-        colors: g.colors, pcs: g.qty, sub: g.sub, total: g.sub,
+        colors: g.colors, pcs: g.qty, sub: g.sub,
         orderIds: g.orderIds,
-        orders, items: u.items.filter(i => i.prod.trim().toUpperCase() === g.prod),
-        mismatch: orders.filter(o => o.mismatch)
+        resi: [...new Set(orders.flatMap(o => o.resi))],
+        notes: [...new Set(orders.map(o => o.note).filter(Boolean))],
+        orders,
+        mismatch: orders.some(o => o.mismatch),
+        discount: sum(orders.map(o => o.discount)) > 0,
       });
     });
   });
-  out.forEach((inv, i) => inv.no = i + 1);
   return out;
 }
 
-// Gudang tidak punya harga, jadi invoice selalu tanpa harga
-const hidePrice = () => FORMAT === 'gudang';
-
-// ---------- invoice markup (satu produk per invoice) ----------
-function invoiceHTML(c) {
-  const hp = hidePrice();
-  const orderLabel = FORMAT === 'gudang' ? 'Order (Nomor)' : 'Order ID';
-  const body = c.colors.map(r => hp
-    ? `<tr><td>${esc(r.warna)}</td><td class="c">${r.qty}x</td></tr>`
-    : `<tr><td>${esc(r.warna)}</td><td class="c">${r.qty}x</td><td class="r">${r.price === null ? '—' : rp(r.price)}</td><td class="r">${rp(r.sub)}</td></tr>`
-  ).join('');
-  const thead = hp
-    ? `<tr><th>Warna</th><th class="c">Qty</th></tr>`
-    : `<tr><th>Warna</th><th class="c">Qty</th><th class="r">Harga</th><th class="r">Subtotal</th></tr>`;
-  const tfoot = hp
-    ? `<tr><td>Total</td><td class="c">${c.pcs}x</td></tr>`
-    : `<tr><td>Total</td><td class="c">${c.pcs}x</td><td></td><td class="r">${rp(c.sub)}</td></tr>`;
-  return `
-  <div class="sheet">
-    <div class="sheet-head">
-      <span>${fmtDate(c.first)}</span>
-      <span class="inv">${esc(c.invNo)}</span>
-    </div>
-    <div class="blk">
-      <div class="lbl">Pengirim</div>
-      <b>${esc(SENDER.nama)} (${esc(SENDER.telp)})</b>
-      <div class="pickup">${esc(c.pickup)}</div>
-    </div>
-    <div class="blk">
-      <div class="lbl">Kepada</div>
-      <b>${esc(c.name)}</b>
-      <div class="part">Part ${c.part} dari ${c.partTotal}</div>
-    </div>
-    <div class="blk">
-      <div class="lbl">Produk</div>
-      <div class="prod">${esc(c.prod)}</div>
-      <div class="ref">${orderLabel}: ${esc(c.orderIds.join(', '))}</div>
-    </div>
-    <table class="items">
-      <thead>${thead}</thead>
-      <tbody>${body}</tbody>
-      <tfoot>${tfoot}</tfoot>
-    </table>
-  </div>`;
+// Customer = gabungan invoice produk dengan nama yang sama
+function groupPersons(invs) {
+  const map = new Map();
+  for (const inv of invs) {
+    if (!map.has(inv.person)) map.set(inv.person, { person: inv.person, name: inv.name, invs: [], orders: new Map() });
+    const p = map.get(inv.person);
+    p.invs.push(inv);
+    inv.orders.forEach(o => p.orders.set(o.id, o));
+  }
+  return [...map.values()].map((p, i) => {
+    const orders = [...p.orders.values()];
+    return {
+      no: i + 1, person: p.person, name: p.name, invs: p.invs,
+      metodes: [...new Set(p.invs.map(x => x.metode).filter(Boolean))],
+      orderCount: orders.length,
+      pcs: sum(p.invs.map(x => x.pcs)),
+      total: sum(orders.map(o => o.total)),
+    };
+  });
 }
 
-// ---------- rekap produk (untuk inventory / picking) ----------
-function rekapHTML(list) {
+// Rekap per produk, dengan rincian warna
+function buildRekap(list) {
   const map = new Map();
   for (const o of list) for (const i of o.items) {
-    const key = i.prod.toUpperCase() + '|' + fmtWarna(i.variasi);
-    if (!map.has(key)) map.set(key, { prod: i.prod.toUpperCase(), warna: fmtWarna(i.variasi), pusat: 0, ds: 0, total: 0, orders: new Set() });
-    const r = map.get(key);
-    r.total += i.qty;
-    if (i.metode.includes('PUSAT')) r.pusat += i.qty;
-    else if (i.metode.includes('DROPSHIP')) r.ds += i.qty;
-    r.orders.add(o.id);
+    const pk = i.prod.trim().toUpperCase();
+    if (!map.has(pk)) map.set(pk, { prod: pk, colors: new Map(), pusat: 0, ds: 0, total: 0, orders: new Set() });
+    const p = map.get(pk);
+    const warna = fmtWarna(i.variasi);
+    if (!p.colors.has(warna)) p.colors.set(warna, { warna, pusat: 0, ds: 0, total: 0, orders: new Set() });
+    const c = p.colors.get(warna);
+    const isP = /PUSAT/i.test(i.metode), isD = /DROPSHIP/i.test(i.metode);
+    for (const t of [p, c]) {
+      t.total += i.qty;
+      if (isP) t.pusat += i.qty; else if (isD) t.ds += i.qty;
+      t.orders.add(o.id);
+    }
+    p.orders.add(o.id);
   }
-  const rows = [...map.values()].sort((a, b) => a.prod.localeCompare(b.prod) || a.warna.localeCompare(b.warna));
-  if (!rows.length) return '<p class="muted">Tidak ada data sesuai filter.</p>';
+  return [...map.values()].sort((a, b) => a.prod.localeCompare(b.prod)).map(p => ({
+    prod: p.prod, pusat: p.pusat, ds: p.ds, total: p.total, orders: p.orders.size,
+    colors: [...p.colors.values()].sort((a, b) => a.warna.localeCompare(b.warna))
+      .map(c => ({ warna: c.warna, pusat: c.pusat, ds: c.ds, total: c.total, orders: c.orders.size })),
+  }));
+}
+
+// ---------- tabel ----------
+function customersTableHTML() {
+  if (!PERSONS.length) return emptyHTML('Tidak ada data sesuai filter.');
+  const price = FORMAT === 'ekspor';
+  const body = PERSONS.map(p => {
+    const id = 'c:' + p.person;
+    const open = EXPANDED.has(id);
+    let h = `<tr class="grp">
+      <td class="pl-3 w-10">${toggleBtn(id, open)}</td>
+      <td><div class="font-semibold">${esc(p.name)}</div><div class="text-xs text-gray-500">${p.orderCount} order</div></td>
+      <td><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="rounded-full px-2 py-0.5 text-[11px] font-medium ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
+      <td class="num">${p.invs.length}</td>
+      <td class="num">${p.pcs}</td>
+      ${price ? `<td class="num font-semibold">${rp(p.total)}</td>` : ''}
+      <td class="pr-4 text-right whitespace-nowrap"><button class="btn-sm" data-print-person="${esc(p.person)}">Cetak semua</button></td>
+    </tr>`;
+    if (open) p.invs.forEach(inv => {
+      const pid = 'p:' + inv.key;
+      const po = EXPANDED.has(pid);
+      h += `<tr class="sub">
+        <td class="pl-6">${toggleBtn(pid, po)}</td>
+        <td class="py-2"><div class="font-medium text-gray-900">${esc(inv.prod)}</div><div class="text-[11px] text-gray-500">Part ${inv.part} dari ${inv.partTotal} · ${esc(inv.invNo)}</div></td>
+        <td><span class="rounded-full px-2 py-0.5 text-[11px] font-medium ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
+        <td></td>
+        <td class="num">${inv.pcs}</td>
+        ${price ? `<td class="num">${rp(inv.sub)}</td>` : ''}
+        <td class="pr-4 text-right whitespace-nowrap">
+          <button class="btn-sm" data-preview="${esc(inv.key)}">Preview</button>
+          <button class="btn-sm" data-print-one="${esc(inv.key)}">Cetak</button>
+        </td>
+      </tr>`;
+      if (po) inv.colors.forEach(c => {
+        h += `<tr class="sub">
+          <td></td>
+          <td class="py-1.5 pl-9 text-gray-600">${esc(c.warna)}${price && c.price !== null ? ` <span class="text-gray-400">· ${rp(c.price)}</span>` : ''}</td>
+          <td></td><td></td>
+          <td class="num">${c.qty}x</td>
+          ${price ? `<td class="num">${rp(c.sub)}</td>` : ''}
+          <td></td>
+        </tr>`;
+      });
+    });
+    return h;
+  }).join('');
+  const head = `<tr>
+    <th class="w-10"></th><th>Customer</th><th>Metode</th>
+    <th class="num">Invoice</th><th class="num">Pcs</th>
+    ${price ? '<th class="num">Total</th>' : ''}
+    <th class="pr-4 text-right">Aksi</th></tr>`;
+  return `<table class="dt"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+function rekapTableHTML() {
+  if (!REKAP.length) return emptyHTML('Tidak ada data sesuai filter.');
   const split = FORMAT === 'gudang';
+  const head = `<tr><th class="w-10"></th><th>Produk / Warna</th>
+    ${split ? '<th class="num">Gudang Pusat</th><th class="num">Dropship</th>' : ''}
+    <th class="num">Total qty</th><th class="pr-4 text-right">Order</th></tr>`;
+  const body = REKAP.map(p => {
+    const id = 'r:' + p.prod;
+    const open = EXPANDED.has(id);
+    let h = `<tr class="grp">
+      <td class="pl-3">${toggleBtn(id, open)}</td>
+      <td><div class="font-semibold">${esc(p.prod)}</div><div class="text-xs text-gray-500">${p.colors.length} warna</div></td>
+      ${split ? `<td class="num">${p.pusat}</td><td class="num">${p.ds}</td>` : ''}
+      <td class="num font-semibold">${p.total}</td>
+      <td class="pr-4 text-right tabular-nums">${p.orders}</td>
+    </tr>`;
+    if (open) p.colors.forEach(c => {
+      h += `<tr class="sub">
+        <td></td>
+        <td class="py-1.5 pl-9 text-gray-600">${esc(c.warna)}</td>
+        ${split ? `<td class="num">${c.pusat}</td><td class="num">${c.ds}</td>` : ''}
+        <td class="num">${c.total}</td>
+        <td class="pr-4 text-right tabular-nums">${c.orders}</td>
+      </tr>`;
+    });
+    return h;
+  }).join('');
+  return `<table class="dt"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+// ---------- invoice ----------
+function invoiceHTML(inv) {
+  const cls = PAPERS[PAPER].cls;
+  const narrow = PAPER === 'thermal58';
+  const ekspor = FORMAT === 'ekspor';
+  const showHarga = ekspor && !narrow;
+  const head = `<tr><th>Warna</th><th class="num">Qty</th>${showHarga ? '<th class="num">Harga</th>' : ''}${ekspor ? '<th class="num">Subtotal</th>' : ''}</tr>`;
+  const rows = inv.colors.map(c => `<tr>
+      <td>${esc(c.warna)}</td>
+      <td class="num">${c.qty}x</td>
+      ${showHarga ? `<td class="num">${c.price === null ? '—' : rp(c.price)}</td>` : ''}
+      ${ekspor ? `<td class="num">${rp(c.sub)}</td>` : ''}
+    </tr>`).join('');
+  const created = inv.orders[0] ? inv.orders[0].created : '';
   return `
-  <table class="rekap">
-    <thead><tr><th>Produk</th><th>Warna</th>${split ? '<th class="n">Gudang Pusat</th><th class="n">Dropship</th>' : ''}<th class="n">Total qty</th><th class="n">Order</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${esc(r.prod)}</td><td>${esc(r.warna)}</td>${split ? `<td class="n">${r.pusat}</td><td class="n">${r.ds}</td>` : ''}<td class="n"><b>${r.total}</b></td><td class="n">${r.orders.size}</td></tr>`).join('')}</tbody>
-  </table>`;
+  <article class="inv-sheet ${cls}">
+    <header class="inv-center">
+      <div class="inv-store">${esc(SENDER.nama)}</div>
+      <div>${esc(SENDER.telp)}</div>
+    </header>
+    <hr class="sep">
+    <div class="inv-title-row"><span class="inv-title">INVOICE</span><span class="inv-no">${esc(inv.invNo)}</span></div>
+    <dl class="inv-kv">
+      <dt>Tanggal</dt><dd>${fmtDate(inv.first)}</dd>
+      ${created ? `<dt>Waktu order</dt><dd>${esc(created)}</dd>` : ''}
+      <dt>Kepada</dt><dd><b>${esc(inv.name)}</b></dd>
+      <dt>Ambil</dt><dd>${esc(inv.pickup)}</dd>
+      <dt>Order ID</dt><dd>${inv.orderIds.map(esc).join(', ')}</dd>
+      ${inv.resi.length ? `<dt>Resi</dt><dd>${inv.resi.map(esc).join('<br>')}</dd>` : ''}
+    </dl>
+    ${inv.notes.length ? `<div class="inv-note"><b>Catatan:</b> ${inv.notes.map(esc).join(' | ')}</div>` : ''}
+    <hr class="sep">
+    <div class="inv-part">Produk ${inv.part} dari ${inv.partTotal}</div>
+    <div class="inv-prod">${esc(inv.prod)}</div>
+    <table class="inv-tbl">
+      <thead>${head}</thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>Total</td>
+        <td class="num">${inv.pcs}x</td>
+        ${showHarga ? '<td></td>' : ''}
+        ${ekspor ? `<td class="num">${rp(inv.sub)}</td>` : ''}
+      </tr></tfoot>
+    </table>
+    ${ekspor ? `<div class="inv-sum"><span>Subtotal produk</span><b>${rp(inv.sub)}</b></div>` : ''}
+    ${ekspor && inv.discount ? '<div class="inv-small">Order ini memakai diskon/voucher. Potongannya tidak dialokasikan per produk.</div>' : ''}
+    ${inv.mismatch ? '<div class="inv-small">Total di file berbeda dari subtotal − diskon.</div>' : ''}
+    <hr class="sep">
+    <div class="inv-foot">Bagian ${inv.part} dari ${inv.partTotal} untuk ${esc(inv.name)}</div>
+    <div class="inv-foot strong">Terima kasih atas pesanan Anda.</div>
+  </article>`;
+}
+
+function rekapSheetHTML() {
+  const cls = PAPERS[PAPER].cls;
+  const split = FORMAT === 'gudang';
+  const body = REKAP.map(p => `
+    <tr class="grp-print">
+      <td><b>${esc(p.prod)}</b></td>
+      ${split ? `<td class="num">${p.pusat}</td><td class="num">${p.ds}</td>` : ''}
+      <td class="num"><b>${p.total}</b></td>
+    </tr>
+    ${p.colors.map(c => `<tr><td>&nbsp;&nbsp;${esc(c.warna)}</td>${split ? `<td class="num">${c.pusat}</td><td class="num">${c.ds}</td>` : ''}<td class="num">${c.total}</td></tr>`).join('')}`).join('');
+  const pcs = sum(REKAP.map(p => p.total));
+  return `
+  <article class="inv-sheet ${cls}">
+    <header class="inv-center">
+      <div class="inv-store">REKAP PRODUK</div>
+      <div>${fmtDate(new Date())}</div>
+    </header>
+    <hr class="sep">
+    <table class="inv-tbl">
+      <thead><tr><th>Produk / Warna</th>${split ? '<th class="num">Pusat</th><th class="num">DS</th>' : ''}<th class="num">Qty</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td>Total pcs</td>${split ? '<td></td><td></td>' : ''}<td class="num">${pcs}</td></tr></tfoot>
+    </table>
+  </article>`;
 }
 
 // ---------- render ----------
 function renderAll() {
-  const list = filtered();
-  CUST = customers(list);
+  const list = filteredOrders();
+  INVOICES = buildInvoices(list);
+  PERSONS = groupPersons(INVOICES);
+  REKAP = buildRekap(list);
 
   const pcs = sum(list.flatMap(o => o.items).map(i => i.qty));
   $('st-orders').textContent = list.length;
-  $('st-cust').textContent = new Set(CUST.map(c => c.person)).size;
+  $('st-cust').textContent = PERSONS.length;
   $('st-items').textContent = sum(list.map(o => o.items.length));
+  $('st-invoices').textContent = INVOICES.length;
   if (FORMAT === 'gudang') {
     $('st-total-label').textContent = 'Total pcs';
     $('st-total').textContent = pcs;
@@ -349,70 +509,113 @@ function renderAll() {
     $('st-total-label').textContent = 'Total';
     $('st-total').textContent = rp(sum(list.map(o => o.total)));
   }
-  $('cust-count').textContent = CUST.length ? `(${CUST.length})` : '';
+  $('cust-count').textContent = PERSONS.length ? `${PERSONS.length} customer · ${INVOICES.length} invoice` : '';
+  $('list').innerHTML = customersTableHTML();
+  $('rekap').innerHTML = rekapTableHTML();
+  $('btn-print-all').disabled = !INVOICES.length;
+  $('btn-print-rekap').disabled = !REKAP.length;
 
-  $('list').innerHTML = CUST.map(c => `
-    <div class="card ${SELECTED === c.key ? 'sel' : ''}">
-      <div>
-        <b>${c.no}. ${esc(c.name)}</b>
-        <div class="muted">${esc(c.prod)} · part ${c.part}/${c.partTotal} · ${c.pcs} pcs</div>
-        ${c.metodeLabel ? `<span class="pill">${esc(c.metodeLabel)}</span>` : ''}
-        ${c.mismatch.length ? `<div class="warn">⚠ ${c.mismatch.length} order total beda dari CSV</div>` : ''}
-      </div>
-      <div class="r">
-        ${FORMAT === 'ekspor' ? `<b>${rp(c.total)}</b>` : ''}
-        <button data-key="${esc(c.key)}">Preview</button>
-      </div>
-    </div>`).join('') || '<p class="muted">Tidak ada data sesuai filter.</p>';
+  if (SELECTED && !INVOICES.some(i => i.key === SELECTED)) closeModal();
+  else if (SELECTED) refreshPreview();
+}
 
-  $('rekap').innerHTML = rekapHTML(list);
-  $('btn-print-all').disabled = !CUST.length;
-  if (SELECTED && !CUST.some(c => c.key === SELECTED)) { closeModal(); return; }
-  if (SELECTED) refreshPreview();
+function refreshInvoiceTable() { $('list').innerHTML = customersTableHTML(); }
+function refreshRekapTable() { $('rekap').innerHTML = rekapTableHTML(); }
+
+// ---------- cetak ----------
+// Thermal: gulungan kertas tidak punya tinggi tetap, jadi setiap struk diukur
+// dan diberi halaman bernama dengan lebar kertas + tinggi struk itu sendiri.
+// A5: halaman tetap, satu customer per halaman.
+function preparePrint(sheetsHTML) {
+  const area = $('print-area');
+  const p = PAPERS[PAPER];
+  area.classList.toggle('thermal', p.thermal);
+  area.classList.toggle('a5', !p.thermal);
+  area.innerHTML = sheetsHTML;
+
+  let css;
+  if (p.thermal) {
+    area.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;';
+    const pxToMm = 25.4 / 96;
+    css = '';
+    area.querySelectorAll('.inv-sheet').forEach((el, i) => {
+      const h = Math.ceil(el.getBoundingClientRect().height * pxToMm) + 3;
+      css += `@page pg${i} { size: ${p.w} ${h}mm; margin: 0; }\n`;
+      el.style.setProperty('page', `pg${i}`);
+    });
+    area.style.cssText = '';
+  } else {
+    css = '@page { size: A5 portrait; margin: 6mm; }';
+  }
+  let st = document.getElementById('page-css');
+  if (!st) { st = document.createElement('style'); st.id = 'page-css'; document.head.appendChild(st); }
+  st.textContent = css;
+}
+
+function doPrint(list) {
+  if (!list.length) return;
+  preparePrint(list.map(invoiceHTML).join(''));
+  window.print();
+}
+
+function printRekap() {
+  if (!REKAP.length) return;
+  preparePrint(rekapSheetHTML());
+  window.print();
+}
+
+// ---------- modal preview ----------
+function siblingsOf(inv) {
+  return INVOICES.filter(x => x.person === inv.person && x.metode === inv.metode);
 }
 
 function refreshPreview() {
-  const c = CUST.find(x => x.key === SELECTED);
-  if (!c) return;
-  $('pv-title').textContent = `${c.name} · ${c.prod}` + (c.metodeLabel ? ` · ${c.metodeLabel}` : '');
-  $('pv').innerHTML = invoiceHTML(c);
-  $('warn').innerHTML = c.mismatch.length
-    ? `<div class="warnbox">⚠ Order berikut total di file tidak sama dengan subtotal − diskon (kemungkinan ada voucher/biaya lain). Invoice memakai nilai Total dari file:<br>${c.mismatch.map(o => esc(o.id)).join('<br>')}</div>`
-    : '';
-}
-
-function openModal() {
-  $('modal').hidden = false;
-  document.body.classList.add('modal-open');
-}
-function closeModal() {
-  $('modal').hidden = true;
-  document.body.classList.remove('modal-open');
-  SELECTED = null;
-  renderAll();
+  const inv = INVOICES.find(i => i.key === SELECTED);
+  if (!inv) return;
+  const sib = siblingsOf(inv);
+  const idx = sib.findIndex(x => x.key === inv.key);
+  $('pv-title').textContent = `${inv.name} · ${inv.prod}`;
+  $('pv-pos').textContent = `${inv.metodeLabel ? inv.metodeLabel + ' · ' : ''}Produk ${inv.part} dari ${inv.partTotal}`;
+  $('btn-prev').disabled = idx <= 0;
+  $('btn-next').disabled = idx >= sib.length - 1;
+  $('pv').innerHTML = invoiceHTML(inv);
+  $('warn').innerHTML = '';
 }
 
 function showPreview(key) {
   SELECTED = key;
-  openModal();
-  renderAll();
+  refreshPreview();
+  $('modal').hidden = false;
+  document.body.classList.add('modal-open');
 }
 
-function doPrint(list) {
-  $('print-area').innerHTML = list.map(invoiceHTML).join('');
-  window.print();
+function closeModal() {
+  $('modal').hidden = true;
+  document.body.classList.remove('modal-open');
+  SELECTED = null;
 }
 
-function doPrintRekap() {
-  const list = filtered();
-  $('print-area').innerHTML = `<div class="sheet"><div class="sheet-head"><span>Rekap produk</span><span class="inv">${fmtDate(new Date())}</span></div>${rekapHTML(list)}</div>`;
-  window.print();
+function stepPreview(d) {
+  const inv = INVOICES.find(i => i.key === SELECTED);
+  if (!inv) return;
+  const sib = siblingsOf(inv);
+  const target = sib[sib.findIndex(x => x.key === inv.key) + d];
+  if (target) { SELECTED = target.key; refreshPreview(); }
+}
+
+// ---------- tab ----------
+function setTab(t) {
+  TAB = t;
+  $('pane-invoice').hidden = t !== 'invoice';
+  $('pane-rekap').hidden = t !== 'rekap';
+  document.querySelectorAll('[data-tab]').forEach(b => {
+    const on = b.dataset.tab === t;
+    b.classList.toggle('seg-on', on);
+    b.setAttribute('aria-selected', String(on));
+  });
 }
 
 // ---------- tahap aplikasi: upload -> konversi -> hasil ----------
-let CONVERTED = false;
-let FILE_NAME = '';
-const wait = ms => new Promise(r => setTimeout(r, ms));
 const CONVERT_STEPS = [
   'Membaca struktur file',
   'Mengelompokkan order per customer',
@@ -433,7 +636,6 @@ function setViews() {
   $('btn-reset').hidden = !has;
 }
 
-// Ringkasan di sidebar kanan, dihitung dari file sebelum konversi
 function updateSummary() {
   const has = ALL.length > 0;
   $('fname').textContent = has ? FILE_NAME : 'Belum ada file.';
@@ -444,7 +646,7 @@ function updateSummary() {
   $('st-orders').textContent = ALL.length;
   $('st-cust').textContent = persons;
   $('st-items').textContent = sum(ALL.map(o => o.items.length));
-  $('st-invoices').textContent = has ? customers(ALL).length : 0;
+  $('st-invoices').textContent = has ? buildInvoices(ALL).length : 0;
   if (FORMAT === 'gudang') {
     $('st-total-label').textContent = 'Total pcs';
     $('st-total').textContent = pcs;
@@ -457,11 +659,19 @@ function updateSummary() {
   $('sum-warn').textContent = mm ? `⚠ ${mm} order total beda dari subtotal − diskon` : '';
 }
 
+function paintMetode() {
+  const hasMetode = ALL.some(o => o.metode);
+  document.querySelectorAll('[data-metode]').forEach(b => {
+    const on = b.dataset.metode === METODE_SEL;
+    b.classList.toggle('seg-on', on);
+    b.disabled = !hasMetode && b.dataset.metode !== '';
+  });
+}
+
 function fillFilterOptions() {
-  const uniq = k => [...new Set(ALL.map(o => o[k]).filter(Boolean))];
-  $('status').innerHTML = '<option value="">Semua</option>' + uniq('status').map(s => `<option>${esc(s)}</option>`).join('');
-  $('metode').innerHTML = '<option value="">Semua</option>' + uniq('metode').map(s => `<option>${esc(s)}</option>`).join('');
-  $('q').value = ''; $('from').value = ''; $('to').value = '';
+  METODE_SEL = '';
+  $('q').value = '';
+  paintMetode();
 }
 
 async function loadFile(f) {
@@ -472,6 +682,7 @@ async function loadFile(f) {
     FILE_NAME = f.name;
     CONVERTED = false;
     SELECTED = null;
+    EXPANDED.clear();
     fillFilterOptions();
     updateSummary();
     setViews();
@@ -494,7 +705,7 @@ function setStep(i, state) {
   li.firstElementChild.textContent = icon[state];
 }
 
-// Konversi: setiap langkah menjalankan pekerjaan nyata, lalu memperbarui progress
+// Setiap langkah menjalankan pekerjaan nyata, lalu memperbarui progress
 async function runConvert() {
   if (!ALL.length || CONVERTED) return;
   $('loader-steps').innerHTML = CONVERT_STEPS.map(s =>
@@ -509,8 +720,8 @@ async function runConvert() {
     setStep(i, 'active');
     $('loader-step').textContent = CONVERT_STEPS[i] + '…';
     await wait(400);
-    if (i === 1) invoices = customers(ALL).length;   // pengelompokan
-    if (i === 2) rekapHTML(ALL);                      // rekap produk
+    if (i === 1) invoices = buildInvoices(ALL).length;
+    if (i === 2) buildRekap(ALL);
     setStep(i, 'done');
     setBar(Math.round(((i + 1) / n) * 100));
     await wait(180);
@@ -521,6 +732,7 @@ async function runConvert() {
   await wait(500);
   $('loader').hidden = true;
   CONVERTED = true;
+  setTab('invoice');
   setViews();
   renderAll();
 }
@@ -530,8 +742,8 @@ function resetAll() {
   FILE_NAME = '';
   CONVERTED = false;
   SELECTED = null;
-  $('modal').hidden = true;
-  document.body.classList.remove('modal-open');
+  EXPANDED.clear();
+  closeModal();
   $('file').value = '';
   fillFilterOptions();
   updateSummary();
@@ -552,23 +764,57 @@ dz.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
 $('btn-convert').addEventListener('click', runConvert);
 $('btn-reset').addEventListener('click', resetAll);
 
-['q', 'status', 'metode', 'from', 'to'].forEach(id =>
-  $(id).addEventListener(id === 'q' ? 'input' : 'change', () => { if (CONVERTED) renderAll(); }));
+$('q').addEventListener('input', () => { if (CONVERTED) renderAll(); });
+document.querySelectorAll('[data-metode]').forEach(b => b.addEventListener('click', () => {
+  METODE_SEL = b.dataset.metode;
+  paintMetode();
+  if (CONVERTED) renderAll();
+}));
 
-$('list').addEventListener('click', e => {
-  const b = e.target.closest('button[data-key]');
-  if (b) showPreview(b.dataset.key);
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+// Pengaturan kertas
+$('paper').value = PAPER;
+$('paper').addEventListener('change', e => {
+  PAPER = e.target.value;
+  try { localStorage.setItem(PAPER_KEY, PAPER); } catch (err) { /* abaikan */ }
+  if (SELECTED) refreshPreview();
 });
 
-$('btn-print-one').addEventListener('click', () => {
-  const c = CUST.find(x => x.key === SELECTED);
-  if (c) doPrint([c]);
-});
-$('btn-print-all').addEventListener('click', () => doPrint(CUST));
-$('btn-print-rekap').addEventListener('click', doPrintRekap);
+// Delegasi: toggle baris & aksi tabel
+function onTableClick(e, refresh) {
+  const t = e.target.closest('[data-toggle]');
+  if (t) {
+    const id = t.dataset.toggle;
+    if (EXPANDED.has(id)) EXPANDED.delete(id); else EXPANDED.add(id);
+    refresh();
+    return;
+  }
+  const pv = e.target.closest('[data-preview]');
+  if (pv) return showPreview(pv.dataset.preview);
+  const one = e.target.closest('[data-print-one]');
+  if (one) return doPrint(INVOICES.filter(i => i.key === one.dataset.printOne));
+  const per = e.target.closest('[data-print-person]');
+  if (per) return doPrint(INVOICES.filter(i => i.person === per.dataset.printPerson));
+}
+$('list').addEventListener('click', e => onTableClick(e, refreshInvoiceTable));
+$('rekap').addEventListener('click', e => onTableClick(e, refreshRekapTable));
 
+// Modal
 document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeModal));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
+$('btn-prev').addEventListener('click', () => stepPreview(-1));
+$('btn-next').addEventListener('click', () => stepPreview(1));
+$('btn-print-one').addEventListener('click', () => doPrint(INVOICES.filter(i => i.key === SELECTED)));
+document.addEventListener('keydown', e => {
+  if ($('modal').hidden) return;
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'ArrowLeft') stepPreview(-1);
+  if (e.key === 'ArrowRight') stepPreview(1);
+});
 
+$('btn-print-all').addEventListener('click', () => doPrint(INVOICES));
+$('btn-print-rekap').addEventListener('click', printRekap);
+
+setTab('invoice');
 setViews();
 updateSummary();
