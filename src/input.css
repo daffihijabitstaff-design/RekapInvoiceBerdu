@@ -149,3 +149,26 @@
     page-break-after: auto;
   }
 }
+
+/* ---------- loader roket ---------- */
+@layer utilities {
+  .rocket-bob {
+    animation: rocket-bob 1.4s ease-in-out infinite;
+  }
+  .flame {
+    transform-box: fill-box;
+    transform-origin: top center;
+    animation: flame 0.28s ease-in-out infinite alternate;
+  }
+}
+@keyframes rocket-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes flame {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rocket-bob, .flame { animation: none; }
+}

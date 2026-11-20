@@ -409,33 +409,156 @@ function doPrintRekap() {
   window.print();
 }
 
-// ---------- events ----------
-$('file').addEventListener('change', async e => {
-  const f = e.target.files[0];
+// ---------- tahap aplikasi: upload -> konversi -> hasil ----------
+let CONVERTED = false;
+let FILE_NAME = '';
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const CONVERT_STEPS = [
+  'Membaca struktur file',
+  'Mengelompokkan order per customer',
+  'Menyusun rekap produk',
+  'Menyiapkan invoice per produk',
+];
+
+function setViews() {
+  const has = ALL.length > 0;
+  $('view-upload').hidden = CONVERTED;
+  $('view-result').hidden = !CONVERTED;
+  $('picked').hidden = !has || CONVERTED;
+  $('picked-name').textContent = FILE_NAME;
+  $('filters').disabled = !CONVERTED;
+  $('filter-hint').hidden = CONVERTED;
+  $('btn-convert').disabled = !has || CONVERTED;
+  $('btn-convert').textContent = CONVERTED ? 'Sudah dikonversi' : 'Convert to Invoice';
+  $('btn-reset').hidden = !has;
+}
+
+// Ringkasan di sidebar kanan, dihitung dari file sebelum konversi
+function updateSummary() {
+  const has = ALL.length > 0;
+  $('fname').textContent = has ? FILE_NAME : 'Belum ada file.';
+  $('fmt').textContent = !has ? 'Belum ada data'
+    : FORMAT === 'gudang' ? 'Template gudang (tanpa harga)' : 'Ekspor berdu.id (dengan harga)';
+  const pcs = sum(ALL.flatMap(o => o.items).map(i => i.qty));
+  const persons = new Set(ALL.map(o => normName(o.reseller || o.buyer))).size;
+  $('st-orders').textContent = ALL.length;
+  $('st-cust').textContent = persons;
+  $('st-items').textContent = sum(ALL.map(o => o.items.length));
+  $('st-invoices').textContent = has ? customers(ALL).length : 0;
+  if (FORMAT === 'gudang') {
+    $('st-total-label').textContent = 'Total pcs';
+    $('st-total').textContent = pcs;
+  } else {
+    $('st-total-label').textContent = 'Total';
+    $('st-total').textContent = rp(sum(ALL.map(o => o.total)));
+  }
+  const mm = ALL.filter(o => o.mismatch).length;
+  $('sum-warn').hidden = !mm;
+  $('sum-warn').textContent = mm ? `⚠ ${mm} order total beda dari subtotal − diskon` : '';
+}
+
+function fillFilterOptions() {
+  const uniq = k => [...new Set(ALL.map(o => o[k]).filter(Boolean))];
+  $('status').innerHTML = '<option value="">Semua</option>' + uniq('status').map(s => `<option>${esc(s)}</option>`).join('');
+  $('metode').innerHTML = '<option value="">Semua</option>' + uniq('metode').map(s => `<option>${esc(s)}</option>`).join('');
+  $('q').value = ''; $('from').value = ''; $('to').value = '';
+}
+
+async function loadFile(f) {
   if (!f) return;
   try {
     const rows = await fileToRows(f);
     ALL = parseOrders(rows);
-    const uniq = k => [...new Set(ALL.map(o => o[k]).filter(Boolean))];
-    $('status').innerHTML = '<option value="">Semua</option>' + uniq('status').map(s => `<option>${esc(s)}</option>`).join('');
-    $('metode').innerHTML = '<option value="">Semua</option>' + uniq('metode').map(s => `<option>${esc(s)}</option>`).join('');
-    $('fname').textContent = `${f.name} — ${ALL.length} order dibaca`;
-    $('fmt').textContent = FORMAT === 'gudang' ? 'Format: template gudang (tanpa harga)' : 'Format: ekspor berdu.id (dengan harga)';
-    SELECTED = null; $('modal').hidden = true; document.body.classList.remove('modal-open');
-    renderAll();
+    FILE_NAME = f.name;
+    CONVERTED = false;
+    SELECTED = null;
+    fillFilterOptions();
+    updateSummary();
+    setViews();
   } catch (err) {
     alert('Gagal membaca file: ' + err.message);
   }
-});
+}
 
-['q', 'status', 'metode', 'from', 'to'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', renderAll));
+function setBar(p) {
+  $('loader-bar').style.width = p + '%';
+  $('loader-pct').textContent = p + '%';
+}
+
+function setStep(i, state) {
+  const li = $('loader-steps').children[i];
+  if (!li) return;
+  const cls = { pending: 'text-gray-400', active: 'font-medium text-accent-600', done: 'text-emerald-600' };
+  const icon = { pending: '○', active: '●', done: '✓' };
+  li.className = 'flex items-center gap-2 ' + cls[state];
+  li.firstElementChild.textContent = icon[state];
+}
+
+// Konversi: setiap langkah menjalankan pekerjaan nyata, lalu memperbarui progress
+async function runConvert() {
+  if (!ALL.length || CONVERTED) return;
+  $('loader-steps').innerHTML = CONVERT_STEPS.map(s =>
+    `<li class="flex items-center gap-2 text-gray-400"><span class="w-4 text-center">○</span><span>${esc(s)}</span></li>`).join('');
+  $('loader-title').textContent = 'Mengonversi data';
+  $('loader').hidden = false;
+  setBar(0);
+
+  const n = CONVERT_STEPS.length;
+  let invoices = 0;
+  for (let i = 0; i < n; i++) {
+    setStep(i, 'active');
+    $('loader-step').textContent = CONVERT_STEPS[i] + '…';
+    await wait(400);
+    if (i === 1) invoices = customers(ALL).length;   // pengelompokan
+    if (i === 2) rekapHTML(ALL);                      // rekap produk
+    setStep(i, 'done');
+    setBar(Math.round(((i + 1) / n) * 100));
+    await wait(180);
+  }
+
+  $('loader-title').textContent = 'Selesai';
+  $('loader-step').textContent = `${invoices} invoice siap`;
+  await wait(500);
+  $('loader').hidden = true;
+  CONVERTED = true;
+  setViews();
+  renderAll();
+}
+
+function resetAll() {
+  ALL = [];
+  FILE_NAME = '';
+  CONVERTED = false;
+  SELECTED = null;
+  $('modal').hidden = true;
+  document.body.classList.remove('modal-open');
+  $('file').value = '';
+  fillFilterOptions();
+  updateSummary();
+  setViews();
+}
+
+// ---------- events ----------
+$('btn-choose').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => loadFile(e.target.files[0]));
+
+const dz = $('dropzone');
+const dzOn = () => dz.classList.add('border-accent-600', 'bg-accent-50');
+const dzOff = () => dz.classList.remove('border-accent-600', 'bg-accent-50');
+['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dzOn(); }));
+['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dzOff(); }));
+dz.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+$('btn-convert').addEventListener('click', runConvert);
+$('btn-reset').addEventListener('click', resetAll);
+
+['q', 'status', 'metode', 'from', 'to'].forEach(id =>
+  $(id).addEventListener(id === 'q' ? 'input' : 'change', () => { if (CONVERTED) renderAll(); }));
 
 $('list').addEventListener('click', e => {
   const b = e.target.closest('button[data-key]');
   if (b) showPreview(b.dataset.key);
 });
-
-
 
 $('btn-print-one').addEventListener('click', () => {
   const c = CUST.find(x => x.key === SELECTED);
@@ -447,4 +570,5 @@ $('btn-print-rekap').addEventListener('click', doPrintRekap);
 document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeModal));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
 
-renderAll();
+setViews();
+updateSummary();
