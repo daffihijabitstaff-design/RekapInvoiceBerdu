@@ -1,0 +1,24 @@
+{
+  "name": "rekap-invoice-berdu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Filter, kelompokkan, dan cetak invoice per produk dari ekspor order berdu.id dan template gudang.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "npm run build:css && npm run build:vendor",
+    "build:css": "tailwindcss -i ./src/input.css -o ./public/css/styles.css --minify",
+    "build:vendor": "node scripts/copy-vendor.js",
+    "watch:css": "tailwindcss -i ./src/input.css -o ./public/css/styles.css --watch",
+    "dev": "npm run build && node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

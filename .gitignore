@@ -1,0 +1,11 @@
+node_modules/
+# hasil build (dibuat ulang oleh "npm run build")
+public/css/styles.css
+public/vendor/
+.DS_Store
+.env
+.env.*
+# file ekspor berisi data pembeli: jangan pernah di-commit
+*.csv
+*.xlsx
+*.xls

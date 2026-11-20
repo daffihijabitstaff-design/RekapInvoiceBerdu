@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- base ---------- */
+@layer base {
+  /* Tailwind's display utilities override the hidden attribute; keep it working */
+  [hidden] {
+    display: none !important;
+  }
+  body {
+    @apply bg-slate-100 text-gray-900 antialiased;
+  }
+  body.modal-open {
+    @apply overflow-hidden;
+  }
+}
+
+/* ---------- components used by JS-generated markup ---------- */
+@layer components {
+  /* customer list card */
+  .card {
+    @apply mb-2 flex items-center justify-between gap-2.5 rounded-lg border border-gray-200 bg-white p-3 transition hover:border-accent-200;
+  }
+  .card.sel {
+    @apply border-accent-600 bg-accent-50 shadow-[inset_3px_0_0_#4338ca];
+  }
+  .card b {
+    @apply text-[13px] font-semibold;
+  }
+  .card .r {
+    @apply flex shrink-0 flex-col items-end gap-1.5 text-right;
+  }
+
+  .muted {
+    @apply mt-0.5 text-xs text-gray-500;
+  }
+  .warn {
+    @apply mt-1 text-xs text-amber-700;
+  }
+  .warnbox {
+    @apply mb-3.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800;
+  }
+  .pill {
+    @apply mt-1 inline-block rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-600;
+  }
+
+  /* ---------- invoice sheet (screen + print) ---------- */
+  .sheet {
+    @apply mx-auto w-[148mm] max-w-full bg-white p-[9mm] text-[11px] text-gray-900 shadow-sm;
+  }
+  .sheet-head {
+    @apply flex items-baseline justify-between border-b-[1.5px] border-gray-900 pb-1.5 text-[13px] font-semibold;
+  }
+  .inv {
+    @apply text-[10px] font-medium tracking-wide text-gray-500;
+  }
+  .blk {
+    @apply border-b border-gray-200 py-2.5;
+  }
+  .lbl {
+    @apply mb-0.5 text-[9px] font-medium uppercase tracking-widest text-gray-500;
+  }
+  .pickup {
+    @apply mt-0.5 font-semibold;
+  }
+  .prod {
+    @apply mt-0.5 text-sm font-bold;
+  }
+  .part {
+    @apply mt-0.5 text-[10.5px] text-gray-700;
+  }
+  .ref {
+    @apply mt-0.5 text-[8.5px] text-gray-400;
+  }
+  table.items {
+    @apply mt-2 w-full border-collapse;
+  }
+  table.items th {
+    @apply border-b border-gray-900 px-0.5 py-1 text-left text-[9px] font-medium uppercase tracking-wider text-gray-500;
+  }
+  table.items th.c {
+    @apply text-center;
+  }
+  table.items th.r {
+    @apply text-right;
+  }
+  table.items td {
+    @apply border-b border-gray-100 px-0.5 py-1.5 align-top;
+  }
+  table.items tfoot td {
+    @apply border-t-[1.5px] border-gray-900 pt-1.5 font-bold;
+  }
+  .r {
+    @apply text-right;
+  }
+  .c {
+    @apply text-center;
+  }
+  .n {
+    @apply text-right tabular-nums;
+  }
+
+  /* ---------- rekap table ---------- */
+  table.rekap {
+    @apply w-full border-collapse text-[13px];
+  }
+  table.rekap th,
+  table.rekap td {
+    @apply border-b border-gray-100 px-3 py-2 text-left;
+  }
+  table.rekap th {
+    @apply sticky top-0 border-b border-gray-200 bg-gray-50 text-[11px] font-semibold uppercase tracking-wider text-gray-500;
+  }
+  table.rekap tbody tr:hover {
+    @apply bg-accent-50/50;
+  }
+  table.rekap td.n,
+  table.rekap th.n {
+    @apply text-right tabular-nums;
+  }
+}
+
+/* ---------- print: only the invoice sheets ---------- */
+#print-area {
+  display: none;
+}
+
+@page {
+  size: A5 portrait;
+  margin: 6mm;
+}
+
+@media print {
+  body > *:not(#print-area) {
+    display: none !important;
+  }
+  #print-area {
+    display: block !important;
+  }
+  body {
+    @apply bg-white;
+  }
+  .sheet {
+    @apply m-0 w-full border-0 p-0 shadow-none;
+    page-break-after: always;
+  }
+  .sheet:last-child {
+    page-break-after: auto;
+  }
+}
