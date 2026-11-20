@@ -63,7 +63,7 @@ flowchart TD
    - Untuk gudang: order yang punya resi dihitung di catatan customer.
 4. **Filter.** Pakai status, metode pengiriman, rentang tanggal, atau kata kunci (nama, produk, SKU, resi). Semua ringkasan dan rekap ikut berubah sesuai filter.
 5. **Rekap produk.** Tabel per produk dan variasi dengan total qty, dipisah antara gudang pusat dan dropship untuk format gudang. Cetak rekap ini sebagai daftar ambil barang.
-6. **Invoice per customer.** Satu invoice berisi semua produk milik customer (per metode pengiriman), diurut nama produk. Produk yang sama dalam satu invoice hanya ditulis di baris pertama. Pilih customer, periksa alamat, telepon, dan catatan. Isi alamat dan telepon di form jika tidak ada di file. Isian manual disimpan di browser dan menang atas data file.
+6. **Invoice per Order ID.** Setiap Order ID menjadi satu invoice, dan nomor invoice-nya adalah Order ID itu sendiri. Semua produk dalam order tersebut digabung dan diurut nama produk. Produk yang sama dalam satu invoice hanya ditulis di baris pertama. Daftar di aplikasi tetap dikelompokkan per customer, dengan invoice-invoice customer itu di bawahnya. Pilih customer, periksa alamat, telepon, dan catatan. Isi alamat dan telepon di form jika tidak ada di file. Isian manual disimpan di browser dan menang atas data file.
 7. **Cetak.** A5 portrait, satu customer per halaman. "Cetak semua" mencetak seluruh hasil filter, dengan invoice yang pendek (sedikit baris) dicetak lebih dulu, baru yang panjang.
 8. **Verifikasi resi.** Nomor resi di catatan (SPXID…, JY…, JZ…, SP…) dicocokkan dengan label kurir sebelum paket diserahkan.
 
@@ -75,7 +75,8 @@ flowchart TD
 | Alamat atau telepon kosong | "(alamat belum diisi)" di invoice | Isi di form sebelum cetak |
 | Order tanpa resi | Catatan kosong untuk order itu | Cek di dashboard berdu.id / kurir |
 | Nama customer ditulis beda (huruf atau spasi) | Digabung otomatis jadi satu customer | Tidak perlu tindakan |
-| Customer punya order pusat dan dropship | Satu invoice dengan dua label metode | Lihat pertanyaan terbuka di B.8 |
+| Customer punya order pusat dan dropship | Dua invoice terpisah, masing-masing dengan Order ID-nya sendiri dan label metodenya | Tidak perlu tindakan |
+| Order tanpa baris produk | Tidak ada invoice untuk order itu | Cek di berdu.id apakah order itu memang kosong atau dibatalkan |
 | File gabungan dari beberapa tanggal | Nomor bisa bentrok antar tanggal | Upload per tanggal dulu (lihat B.7) |
 
 ### A.6 Yang tidak dilakukan aplikasi (sengaja)
