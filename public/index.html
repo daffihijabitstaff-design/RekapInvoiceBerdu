@@ -139,21 +139,21 @@
     <section>
       <h3 class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Filter</h3>
       <p id="filter-hint" class="mb-3 text-xs text-gray-500">Tersedia setelah Convert to Invoice.</p>
-      <fieldset id="filters" disabled class="flex flex-col gap-3 transition disabled:pointer-events-none disabled:opacity-40">
+      <fieldset id="filters" disabled class="flex w-full min-w-0 flex-col gap-3 transition disabled:pointer-events-none disabled:opacity-40">
         <div>
           <label for="q" class="mb-1.5 block text-xs font-medium text-gray-700">Cari nama</label>
           <input id="q" placeholder="Nama, produk, SKU, resi" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-[13px] focus:border-accent-600 focus:outline-none focus:ring-[3px] focus:ring-accent-200">
         </div>
         <div>
           <span class="mb-1.5 block text-xs font-medium text-gray-700">Metode pengiriman</span>
-          <div class="flex gap-1 rounded-lg bg-gray-100 p-1">
-            <button type="button" class="seg-btn seg-on" data-metode="">
+          <div class="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1">
+            <button type="button" class="seg-btn seg-on !px-1.5 !gap-1 text-[11px]" data-metode="">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Semua</span>
             </button>
-            <button type="button" class="seg-btn" data-metode="DIAMBIL DI GUDANG PUSAT">
+            <button type="button" class="seg-btn !px-1.5 !gap-1 text-[11px]" data-metode="DIAMBIL DI GUDANG PUSAT">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg><span>Gudang Pusat</span>
             </button>
-            <button type="button" class="seg-btn" data-metode="DIAMBIL DI GUDANG DROPSHIP">
+            <button type="button" class="seg-btn !px-1.5 !gap-1 text-[11px]" data-metode="DIAMBIL DI GUDANG DROPSHIP">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 4h14v12H1z"/><path d="M15 9h4l3 3v4h-7"/><circle cx="5.5" cy="18" r="2"/><circle cx="18.5" cy="18" r="2"/></svg><span>Dropship</span>
             </button>
           </div>
