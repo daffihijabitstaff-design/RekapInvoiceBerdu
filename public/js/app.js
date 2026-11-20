@@ -8,6 +8,8 @@ const RESI_RE = /\b(SPXID[0-9A-Z]+|JY\d{8,}|JZ\d{8,}|SP\d{10,}|\d{16,})\b/g;
 
 let FORMAT = 'ekspor';  // 'ekspor' | 'gudang'
 let ALL = [];           // semua order hasil parse
+let WARN = [];          // peringatan pemeriksaan data: { level: 'error'|'warn'|'info', msg }
+const warn = (level, msg) => WARN.push({ level, msg });
 
 const $ = id => document.getElementById(id);
 const sum = a => a.reduce((x, y) => x + y, 0);
@@ -44,6 +46,12 @@ function fileToRows(file) {
         if (isX) {
           const wb = XLSX.read(r.result, { type: 'array' });
           const ws = wb.Sheets[wb.SheetNames[0]];
+          Object.keys(ws).forEach(a => {
+            const c = ws[a];
+            if (a[0] !== '!' && c && c.t === 'n' && Math.abs(c.v) >= 1e15 && !/E\+/i.test(c.w || '')) {
+              warn('error', `Sel ${a} berisi angka ${c.w || c.v} (lebih dari 15 digit). Excel hanya menyimpan 15 digit, nomor resi/ID di sel ini bisa keliru. Ubah kolom ke Teks lalu simpan ulang.`);
+            }
+          });
           resolve(XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }));
         } else resolve(parseCSV(r.result.replace(/^﻿/, '')));
       } catch (e) { reject(e); }
@@ -90,6 +98,7 @@ function cleanNote(raw) {
 function parseOrders(rows) {
   // Abaikan baris penanda pemisah Excel (mis. "sep=,")
   if (rows.length && /^sep=/i.test(String(rows[0][0] || ''))) rows = rows.slice(1);
+  checkNotation(rows);
   const head = rows[0].map(h => String(h).trim());
   // Template gudang dicek lebih dulu: versi terbaru juga memuat kolom "Order Id"
   if (head.includes('Nomor') && head.includes('Nama Produk') && head.includes('Metode Pengiriman')) {
@@ -117,32 +126,41 @@ function parseEkspor(rows, head) {
   const get = (r, k) => I[k] >= 0 ? String(r[I[k]] ?? '').trim() : '';
   const opt = (r, k) => OPT[k] >= 0 ? String(r[OPT[k]] ?? '').trim() : '';
 
-  const orders = []; let cur = null;
-  for (const r of rows.slice(1)) {
-    if (!r.some(c => String(c).trim())) continue;
+  const orders = []; const seen = new Set(); let cur = null;
+  rows.slice(1).forEach((r, k) => {
+    const line = k + 1;
+    if (!r.some(c => String(c).trim())) return;
     if (get(r, 'id')) {
+      const id = get(r, 'id');
+      if (seen.has(id)) warn('error', `Order ${id} muncul lebih dari sekali (baris ${line}). Pcs dan total dihitung dua kali.`);
+      seen.add(id);
+      if (get(r, 'sent') && !parseDate(get(r, 'sent'))) warn('warn', `Tanggal kirim tidak terbaca pada order ${id}: "${get(r, 'sent')}"`);
       cur = {
-        id: get(r, 'id'), buyer: get(r, 'buyer'), reseller: get(r, 'reseller'),
+        id, buyer: get(r, 'buyer'), reseller: get(r, 'reseller'),
         sent: parseDate(get(r, 'sent')), status: get(r, 'status'), metode: '',
         created: get(r, 'created'), discount: toInt(get(r, 'disc')), total: toInt(get(r, 'total')), items: [],
         addr: opt(r, 'alamat'), tel: opt(r, 'telp'), note: opt(r, 'catatan'), resi: []
       };
       orders.push(cur);
     }
-    if (cur && get(r, 'prod')) {
-      const qty = toInt(get(r, 'qty')) || 1, price = toInt(get(r, 'price'));
+    if (get(r, 'prod')) {
+      if (!cur) { warn('error', `Baris produk tanpa order di baris ${line} (diabaikan): "${get(r, 'prod')}"`); return; }
+      const rawQty = get(r, 'qty');
+      if (!/^\d+$/.test(rawQty)) warn('warn', `Jumlah "${rawQty || '(kosong)'}" tidak valid pada order ${cur.id}, produk ${get(r, 'prod')} (dihitung 1)`);
+      const qty = toInt(rawQty) || 1, price = toInt(get(r, 'price'));
       cur.items.push({ prod: get(r, 'prod'), variasi: get(r, 'variasi'), sku: get(r, 'sku'),
                        qty, price, sub: qty * price, buyer: cur.buyer, orderId: cur.id, metode: '' });
     }
-  }
+  });
   orders.forEach(o => {
     o.subtotal = sum(o.items.map(i => i.sub));
     o.mismatch = o.subtotal - o.discount !== o.total;
+    if (o.mismatch) warn('warn', `Order ${o.id}: total ${rp(o.total)} tidak sama dengan subtotal − diskon (${rp(o.subtotal - o.discount)})`);
   });
   return orders;
 }
 
-// Template gudang: baris dengan Nomor = order baru, baris kosong Nomor = item lanjutan. Tidak ada harga.
+// Template gudang: baris dengan Order Id / Nomor = order baru, baris kosong = item lanjutan. Tidak ada harga.
 function parseGudang(rows, head) {
   const idx = n => head.indexOf(n);
   const C = {
@@ -152,27 +170,133 @@ function parseGudang(rows, head) {
   };
   const get = (r, k) => C[k] >= 0 ? String(r[C[k]] ?? '').trim() : '';
 
-  const orders = []; let cur = null;
-  for (const r of rows.slice(1)) {
-    if (!r.some(c => String(c).trim())) continue;
-    if (get(r, 'oid') || get(r, 'no')) {
+  const orders = []; const seen = new Set(); let cur = null;
+  rows.slice(1).forEach((r, k) => {
+    const line = k + 1;
+    if (!r.some(c => String(c).trim())) return;
+    const oid = get(r, 'oid'), no = get(r, 'no');
+    if (oid || no) {
+      const id = oid || no;
+      if (seen.has(id)) warn('error', `Order ${id} muncul lebih dari sekali (baris ${line}). Pcs dihitung dua kali.`);
+      seen.add(id);
       const { note, resi } = cleanNote(get(r, 'catatan'));
+      const metode = get(r, 'metode');
+      if (!metode) warn('warn', `Metode pengiriman kosong pada order ${id}`);
+      else if (!/PUSAT|DROPSHIP/i.test(metode)) warn('warn', `Metode pengiriman tidak dikenali "${metode}" pada order ${id}`);
+      const buyer = get(r, 'buyer');
+      if (!buyer) warn('warn', `Nama pembeli kosong pada order ${id}`);
+      else if (/\d/.test(buyer)) warn('info', `Nama pembeli memuat angka/ID: "${buyer}" (order ${id}). Nama dipakai apa adanya, pastikan konsisten.`);
+      const created = get(r, 'created');
+      const sent = parseDate(created);
+      if (!sent) warn('warn', `Tanggal tidak terbaca pada order ${id}: "${created || '(kosong)'}"`);
       cur = {
-        id: get(r, 'oid') || get(r, 'no'), buyer: get(r, 'buyer'), reseller: get(r, 'buyer'),
-        sent: parseDate(get(r, 'created')), status: get(r, 'status'), metode: get(r, 'metode'),
-        created: get(r, 'created'), discount: 0, total: 0, items: [],
+        id, buyer, reseller: buyer,
+        sent, status: get(r, 'status'), metode,
+        created, discount: 0, total: 0, items: [],
         addr: '', tel: '', note, resi, mismatch: false
       };
       orders.push(cur);
     }
-    if (cur && get(r, 'prod')) {
+    if (get(r, 'prod')) {
+      if (!cur) { warn('error', `Baris produk tanpa order di baris ${line} (diabaikan): "${get(r, 'prod')}"`); return; }
+      const rawQty = get(r, 'qty');
+      if (!/^\d+$/.test(rawQty)) warn('warn', `Jumlah "${rawQty || '(kosong)'}" tidak valid pada order ${cur.id}, produk ${get(r, 'prod')} (dihitung 1)`);
       cur.items.push({ prod: get(r, 'prod'), variasi: get(r, 'variasi'), sku: '',
-                       qty: toInt(get(r, 'qty')) || 1, price: 0, sub: 0,
+                       qty: toInt(rawQty) || 1, price: 0, sub: 0,
                        buyer: cur.buyer, orderId: cur.id, metode: cur.metode });
     }
-  }
+  });
   orders.forEach(o => o.subtotal = 0);
   return orders;
+}
+
+// Sel angka berformat ilmiah (1.23457E+18) berarti nomor sudah rusak di file sumber
+function checkNotation(rows) {
+  const head = rows[0] || [];
+  rows.forEach((r, k) => {
+    if (!k) return;
+    r.forEach((c, j) => {
+      const v = String(c).trim();
+      if (/^-?\d+(\.\d+)?E[+-]\d+$/i.test(v)) {
+        const col = head[j] ? String(head[j]).trim() : `kolom ${j + 1}`;
+        warn('error', `Angka "${v}" di ${col} (baris ${k}) berformat ilmiah, nomor di sel ini rusak. Ubah kolom ke Teks lalu simpan ulang.`);
+      }
+    });
+  });
+}
+
+// Jarak edit (Levenshtein) untuk mendeteksi typo
+function lev(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Pasangan nama yang mirip dan jarang muncul: kemungkinan typo dari nama yang lebih sering
+function similarPairs(counts, minLen) {
+  const names = [...counts.keys()], out = [];
+  for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
+    const a = names[i], b = names[j];
+    if (Math.min(a.length, b.length) < minLen || lev(a, b) > 1) continue;
+    if (a.replace(/\d/g, '') === b.replace(/\d/g, '')) continue;   // hanya angka yang beda (HAPPY 1 / HAPPY 2)
+    const [rare, common] = counts.get(a) <= counts.get(b) ? [a, b] : [b, a];
+    if (counts.get(rare) <= 2 && counts.get(common) >= counts.get(rare)) out.push([rare, common]);
+  }
+  return out;
+}
+
+function checkTypos() {
+  const prod = new Map(), warna = new Map(), cust = new Map();
+  const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+  for (const o of ALL) {
+    const key = normName(o.reseller || o.buyer);
+    if (key) bump(cust, key);
+    for (const i of o.items) {
+      bump(prod, i.prod.trim().replace(/\s+/g, ' ').toUpperCase());
+      const w = fmtWarna(i.variasi);
+      if (w !== '—') bump(warna, w);
+    }
+  }
+  similarPairs(prod, 4).forEach(([r, c]) => warn('warn', `Kemungkinan typo produk: "${r}" (${prod.get(r)} baris) mirip "${c}" (${prod.get(c)} baris). Cek penulisan nama produk.`));
+  similarPairs(warna, 4).forEach(([r, c]) => warn('warn', `Kemungkinan typo warna: "${r}" (${warna.get(r)} baris) mirip "${c}" (${warna.get(c)} baris).`));
+  similarPairs(cust, 5).forEach(([r, c]) => warn('warn', `Kemungkinan dua customer sama: "${r}" mirip "${c}". Cek penulisan nama.`));
+}
+
+const LVL = {
+  error: { cls: 'border-rose-200 bg-rose-50 text-rose-800', dot: 'bg-rose-500', label: 'error' },
+  warn:  { cls: 'border-amber-200 bg-amber-50 text-amber-800', dot: 'bg-amber-500', label: 'peringatan' },
+  info:  { cls: 'border-sky-200 bg-sky-50 text-sky-800', dot: 'bg-sky-500', label: 'info' },
+};
+
+// Panel pemeriksaan data di sidebar
+function renderWarnings() {
+  const box = $('sum-warn');
+  if (!ALL.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  if (!WARN.length) {
+    box.innerHTML = `<div class="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">${icon('check')}<span>Semua data terbaca, tidak ada typo yang terdeteksi.</span></div>`;
+    return;
+  }
+  const n = { error: 0, warn: 0, info: 0 };
+  WARN.forEach(w => n[w.level]++);
+  const counts = Object.keys(LVL).filter(l => n[l]).map(l => `${n[l]} ${LVL[l].label}`).join(' · ');
+  box.innerHTML = `
+    <div class="mb-2 flex items-center justify-between gap-2 text-xs">
+      <span class="flex items-center gap-1.5 font-semibold text-gray-800">${icon('alert')} Pemeriksaan data</span>
+      <span class="text-gray-500">${counts}</span>
+    </div>
+    <ul class="max-h-64 space-y-1.5 overflow-auto pr-1">
+      ${WARN.map(w => `<li class="flex gap-2 rounded-md border px-2.5 py-1.5 text-[11px] leading-snug ${LVL[w.level].cls}"><span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${LVL[w.level].dot}"></span><span>${esc(w.msg)}</span></li>`).join('')}
+    </ul>`;
 }
 
 // ---------- konfigurasi cetak & filter ----------
@@ -245,8 +369,33 @@ function filteredOrders() {
 }
 
 // ---------- pengelompokan ----------
+// Indeks tetap dari SEMUA order (tidak ikut filter), supaya nomor invoice tidak berubah saat filter dipakai
+function fullIndex() {
+  const units = new Map();
+  for (const o of ALL) {
+    const raw = o.reseller || o.buyer || '(tanpa nama)';
+    const person = normName(raw) || '(tanpa nama)';
+    const metode = o.metode || '';
+    const key = person + '|' + metode;
+    if (!units.has(key)) units.set(key, { person, metode, name: raw.trim().replace(/\s+/g, ' '), orders: [], items: [] });
+    const u = units.get(key);
+    u.orders.push(o);
+    u.items.push(...o.items);
+  }
+  const sorted = [...units.values()].sort((a, b) => a.name.localeCompare(b.name) || a.metode.localeCompare(b.metode));
+  const idx = new Map();
+  sorted.forEach((u, ui) => {
+    const groups = productGroups(u.items);
+    const parts = new Map(groups.map((g, gi) => [g.prod, { part: gi + 1, total: groups.length }]));
+    const first = u.orders.map(o => o.sent).filter(Boolean).sort((a, b) => a - b)[0] || null;
+    idx.set(u.person + '|' + u.metode, { no: ui + 1, first, parts });
+  });
+  return idx;
+}
+
 // Satu invoice per produk, per customer dan metode pengiriman
 function buildInvoices(list) {
+  const full = fullIndex();
   const units = new Map();
   for (const o of list) {
     const raw = o.reseller || o.buyer || '(tanpa nama)';
@@ -260,18 +409,18 @@ function buildInvoices(list) {
   }
   const sorted = [...units.values()].sort((a, b) => a.name.localeCompare(b.name) || a.metode.localeCompare(b.metode));
   const out = [];
-  sorted.forEach((u, ui) => {
-    const groups = productGroups(u.items);
-    const first = u.orders.map(o => o.sent).filter(Boolean).sort((a, b) => a - b)[0] || null;
-    groups.forEach((g, gi) => {
+  for (const u of sorted) {
+    const f = full.get(u.person + '|' + u.metode);
+    for (const g of productGroups(u.items)) {
+      const pi = f.parts.get(g.prod);
       const orders = u.orders.filter(o => o.items.some(i => i.prod.trim().toUpperCase() === g.prod));
       out.push({
         key: u.person + '|' + u.metode + '|' + g.prod,
         person: u.person, name: u.name, metode: u.metode, metodeLabel: metodeShort(u.metode),
-        pickup: u.metode || SENDER.pickup,
-        first,
-        invNo: `INV/${ymdCompact(first)}/${String(ui + 1).padStart(3, '0')}-P${gi + 1}`,
-        prod: g.prod, part: gi + 1, partTotal: groups.length,
+        pickup: u.metode || 'Metode belum diisi',
+        first: f.first,
+        invNo: `INV/${ymdCompact(f.first)}/${String(f.no).padStart(3, '0')}-P${pi.part}`,
+        prod: g.prod, part: pi.part, partTotal: pi.total,
         colors: g.colors, pcs: g.qty, sub: g.sub,
         orderIds: g.orderIds,
         resi: [...new Set(orders.flatMap(o => o.resi))],
@@ -280,8 +429,8 @@ function buildInvoices(list) {
         mismatch: orders.some(o => o.mismatch),
         discount: sum(orders.map(o => o.discount)) > 0,
       });
-    });
-  });
+    }
+  }
   return out;
 }
 
@@ -299,6 +448,7 @@ function groupPersons(invs) {
     return {
       no: i + 1, person: p.person, name: p.name, invs: p.invs,
       metodes: [...new Set(p.invs.map(x => x.metode).filter(Boolean))],
+      notes: [...new Set(p.invs.flatMap(x => x.notes))].map(n => n.replace(/\s*\n\s*/g, ' ')),
       orderCount: orders.length,
       pcs: sum(p.invs.map(x => x.pcs)),
       total: sum(orders.map(o => o.total)),
@@ -339,6 +489,9 @@ const ICON = {
   chevL: '<path d="M15 6l-6 6 6 6"/>',
   chevsL: '<path d="M11 6l-6 6 6 6"/><path d="M18 6l-6 6 6 6"/>',
   chevsR: '<path d="M13 6l6 6-6 6"/><path d="M6 6l6 6-6 6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  note: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
 };
 const icon = (k, cls = 'h-3.5 w-3.5') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 const btn = (kind, ic, label, attrs = '') => `<button type="button" class="btn btn-${kind}" ${attrs}>${icon(ic)}<span>${label}</span></button>`;
@@ -361,7 +514,7 @@ function invoiceTableHTML(rows, price) {
     const open = EXPANDED.has(id);
     let h = `<tr class="grp${open ? ' open' : ''}" data-row="${esc(id)}">
       <td class="w-12">${toggleBtn(id, open)}</td>
-      <td><div class="font-semibold">${esc(p.name)}</div><div class="text-xs text-gray-500">${p.orderCount} order</div></td>
+      <td><div class="font-semibold">${esc(p.name)}</div><div class="text-xs text-gray-500">${p.orderCount} order</div>${p.notes.length ? `<div class="mt-1 flex max-w-xs items-start gap-1 text-[11px] text-amber-800" title="${esc(p.notes.join(' | '))}">${icon('note', 'mt-px h-3 w-3 shrink-0')}<span class="line-clamp-2">${esc(p.notes.join(' · '))}</span></div>` : ''}</td>
       <td><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="pill ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
       <td class="num">${p.invs.length}</td>
       <td class="num">${p.pcs}</td>
@@ -772,7 +925,7 @@ function updateSummary() {
   if (!CONVERTED) {
     ['st-orders', 'st-cust', 'st-invoices', 'st-total'].forEach(id => $(id).textContent = '–');
     $('st-total-label').textContent = 'Total';
-    $('sum-warn').hidden = true;
+    renderWarnings();
     return;
   }
   const pcs = sum(ALL.flatMap(o => o.items).map(i => i.qty));
@@ -787,9 +940,7 @@ function updateSummary() {
     $('st-total-label').textContent = 'Total';
     $('st-total').textContent = rp(sum(ALL.map(o => o.total)));
   }
-  const mm = ALL.filter(o => o.mismatch).length;
-  $('sum-warn').hidden = !mm;
-  $('sum-warn').textContent = mm ? `⚠ ${mm} order total beda dari subtotal − diskon` : '';
+  renderWarnings();
 }
 
 function paintMetode() {
@@ -811,9 +962,11 @@ function fillFilterOptions() {
 
 async function loadFile(f) {
   if (!f) return;
+  WARN = [];
   try {
     const rows = await fileToRows(f);
     ALL = parseOrders(rows);
+    checkTypos();
     FILE_NAME = f.name;
     CONVERTED = false;
     SELECTED = null;
@@ -874,6 +1027,7 @@ async function runConvert() {
 
 function resetAll() {
   ALL = [];
+  WARN = [];
   FILE_NAME = '';
   CONVERTED = false;
   SELECTED = null;
