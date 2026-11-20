@@ -527,7 +527,7 @@ function invoiceTableHTML(rows, price) {
     let h = `<tr class="grp${open ? ' open' : ''}" data-row="${esc(id)}">
       <td class="w-12">${toggleBtn(id, open)}</td>
       <td><div class="font-semibold">${esc(p.name)}</div><div class="text-xs text-gray-500">${p.orderCount} order</div>${p.notes.length ? `<div class="mt-1 flex max-w-xs items-start gap-1 text-[11px] text-amber-800" title="${esc(p.notes.join(' | '))}">${icon('note', 'mt-px h-3 w-3 shrink-0')}<span class="line-clamp-2">${esc(p.notes.join(' · '))}</span></div>` : ''}</td>
-      <td><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="pill ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
+      <td class="hidden md:table-cell"><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="pill ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
       <td class="num">${p.invs.length}</td>
       <td class="num">${p.pcs}</td>
       ${price ? `<td class="num font-semibold">${rp(p.total)}</td>` : ''}
@@ -539,7 +539,7 @@ function invoiceTableHTML(rows, price) {
       h += `<tr class="lvl1${animCls(id)}" data-parent="${esc(id)}" data-row="${esc(pid)}"${fx(id, i)}>
         <td>${toggleBtn(pid, po)}</td>
         <td><div class="font-medium text-gray-900">${esc(inv.prod)}</div><div class="text-[11px] text-gray-500">Part ${inv.part} dari ${inv.partTotal} · ${esc(inv.invNo)}</div></td>
-        <td><span class="pill ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
+        <td class="hidden md:table-cell"><span class="pill ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
         <td></td>
         <td class="num">${inv.pcs}</td>
         ${price ? `<td class="num">${rp(inv.sub)}</td>` : ''}
@@ -559,7 +559,7 @@ function invoiceTableHTML(rows, price) {
     return h;
   }).join('');
   const head = `<tr>
-    <th class="w-12"></th><th>Customer</th><th>Metode</th>
+    <th class="w-12"></th><th>Customer</th><th class="hidden md:table-cell">Metode</th>
     <th class="num">Invoice</th><th class="num">Pcs</th>
     ${price ? '<th class="num">Total</th>' : ''}
     <th class="act-h">Aksi</th></tr>`;
