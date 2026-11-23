@@ -931,7 +931,7 @@ function escposInvoice(inv, feed) {
   let s = ESC_INIT;
   s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama) + '\n' + DBL_OFF;
   s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
-  s += '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis putus-putus di atas INVOICE
+  s += rule();   // garis di atas INVOICE
   s += BOLD_ON + row2('INVOICE', escAscii(inv.invNo)) + '\n' + BOLD_OFF;
   const meta = [
     ['Tanggal', fmtDate(inv.first)],
@@ -946,7 +946,7 @@ function escposInvoice(inv, feed) {
   }
   s += rule();
   s += BOLD_ON + row3('PRODUK', 'WARNA', 'QTY') + '\n' + BOLD_OFF;
-  s += '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis putus-putus di bawah header
+  s += rule();   // garis di bawah header tabel
   // setiap baris produk dipisah garis tipis; baris yang dibungkus tidak diberi garis
   const blocks = [];
   for (const g of inv.groups) {
