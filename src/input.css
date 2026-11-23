@@ -480,3 +480,26 @@
     font-weight: 800;
   }
 }
+
+/* ---------- invoice thermal: gaya mono rapat seperti struk printer (sesuai preview) ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80,
+  .inv-sheet.paper-thermal58 {
+    font-family: Consolas, "Lucida Console", "Liberation Mono", ui-monospace, monospace;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .inv-sheet.paper-thermal80 { font-size: 12px; }
+  .inv-sheet.paper-thermal58 { font-size: 11px; }
+  .inv-sheet.paper-thermal80 .inv-store,
+  .inv-sheet.paper-thermal58 .inv-store,
+  .inv-sheet.paper-thermal80 .inv-title,
+  .inv-sheet.paper-thermal58 .inv-title { font-weight: 700; }
+  .inv-sheet.paper-thermal80 table.inv-lines td,
+  .inv-sheet.paper-thermal58 table.inv-lines td {
+    font-weight: 400;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+}

@@ -869,6 +869,8 @@ const QZ = { on: false, printer: 'TM-T82', feed: 3 };
 const ESC_CUT = '\x1D\x56\x41\x00';   // GS V 65 0: feed ke posisi potong lalu potong penuh
 const ESC_FEED = n => '\x1B\x64' + String.fromCharCode(n); // ESC d n: feed n baris
 const ESC_INIT = '\x1B\x40';
+const FONT_A = '\x1B\x4D\x00';          // ESC M 0: Font A (12x24), 48 kolom pada 80 mm
+const LINE_TIGHT = '\x1B\x33\x20';      // ESC 3 32: jarak antar baris dirapatkan (32/203 inci)
 const ALIGN_C = '\x1B\x61\x01', ALIGN_L = '\x1B\x61\x00';
 const BOLD_ON = '\x1B\x45\x01', BOLD_OFF = '\x1B\x45\x00';
 const DBL_ON = '\x1D\x21\x11', DBL_OFF = '\x1D\x21\x00';
@@ -928,7 +930,7 @@ const rule = () => '-'.repeat(W58) + '\n';
 // satu invoice sebagai byte ESC/POS, diakhiri garis potong dan perintah potong
 function escposInvoice(inv, feed) {
   const created = inv.orders[0] ? inv.orders[0].created : '';
-  let s = ESC_INIT;
+  let s = ESC_INIT + FONT_A + LINE_TIGHT;
   s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama) + '\n' + DBL_OFF;
   s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
   s += rule();   // garis di atas INVOICE
