@@ -880,7 +880,7 @@ function loadQz() {
     if (v) Object.assign(QZ, { on: !!v.on, printer: String(v.printer || QZ.printer), feed: Number(v.feed ?? QZ.feed) });
   } catch (err) { /* abaikan */ }
   $('qz-on').checked = QZ.on;
-  $('qz-printer').value = QZ.printer;
+  $('qz-printer').innerHTML = `<option value="${esc(QZ.printer)}">${esc(QZ.printer)} (tekan Muat)</option>`;
   $('qz-feed').value = QZ.feed;
   $('qz-box').hidden = !QZ.on;
 }
@@ -964,10 +964,44 @@ async function qzConnect() {
   if (!qz.websocket.isActive()) await qz.websocket.connect({ retries: 1, delay: 1 });
 }
 
+// nama harus persis sama dengan daftar printer Windows, tidak lagi pencocokan sebagian
 async function qzPrinterName() {
   await qzConnect();
-  const found = await qz.printers.find(QZ.printer.trim());
-  return Array.isArray(found) ? found[0] : found;
+  const all = await qz.printers.find();
+  const hit = (Array.isArray(all) ? all : [all]).find(n => n === QZ.printer);
+  if (!hit) throw new Error(`Printer "${QZ.printer}" tidak ditemukan. Klik Muat untuk memperbarui daftar`);
+  return hit;
+}
+
+// isi dropdown dengan semua printer yang terlihat oleh QZ Tray
+async function qzLoadPrinters() {
+  setQzStatus('Memuat daftar printer...');
+  try {
+    await qzConnect();
+    const all = (await qz.printers.find()) || [];
+    const names = Array.isArray(all) ? all : [all];
+    const sel = $('qz-printer');
+    sel.innerHTML = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if (QZ.printer && !names.includes(QZ.printer)) {
+      sel.insertAdjacentHTML('afterbegin', `<option value="${esc(QZ.printer)}" disabled>${esc(QZ.printer)} (tidak ditemukan)</option>`);
+    }
+    if (names.includes(QZ.printer)) sel.value = QZ.printer;
+    else if (names.length) { QZ.printer = names[0]; sel.value = names[0]; saveQz(); }
+    setQzStatus(names.length ? `${names.length} printer terdeteksi. Tujuan: ${QZ.printer}.` : 'Tidak ada printer terdeteksi di Windows.', !names.length);
+    refreshPrintTarget();
+  } catch (err) {
+    setQzStatus('Gagal memuat daftar: ' + String(err && err.message ? err.message : err).replace(/\.$/, '') + '.', true);
+  }
+}
+
+// keterangan tujuan cetak di tahap 3 dan di tombol Print Invoice
+function refreshPrintTarget() {
+  const btn = $('btn-print-invoice');
+  if (btn) btn.querySelector('span').textContent = QZ.on ? `Cetak ke ${QZ.printer}` : 'Print Invoice';
+  if (PRINT_STEP) {
+    const n = selectedInvoices().length;
+    $('print-sub').textContent = `${n} invoice dipilih · ${PAPERS[PAPER].label} · ${QZ.on ? `via QZ Tray ke ${QZ.printer}` : 'dialog cetak browser'} · urut dari yang paling pendek`;
+  }
 }
 
 async function qzPrintList(list) {
@@ -1023,6 +1057,7 @@ function confirmUrl(list) {
 function renderPrintStep() {
   const list = printOrder(selectedInvoices());
   $('print-sub').textContent = `${list.length} invoice dipilih · ${PAPERS[PAPER].label} · urut dari yang paling pendek`;
+  refreshPrintTarget();
   $('print-list').innerHTML = list.length
     ? list.map(invoiceHTML).join('')
     : emptyHTML('Belum ada invoice yang dipilih.');
@@ -1336,8 +1371,10 @@ $('qz-on').addEventListener('change', e => {
   QZ.on = e.target.checked;
   $('qz-box').hidden = !QZ.on;
   saveQz();
+  refreshPrintTarget();
 });
-$('qz-printer').addEventListener('change', e => { QZ.printer = e.target.value.trim() || 'TM-T82'; saveQz(); });
+$('qz-printer').addEventListener('change', e => { QZ.printer = e.target.value; saveQz(); refreshPrintTarget(); });
+$('qz-refresh').addEventListener('click', qzLoadPrinters);
 $('qz-feed').addEventListener('change', e => { QZ.feed = Math.min(20, Math.max(0, Number(e.target.value) || 0)); e.target.value = QZ.feed; saveQz(); });
 $('qz-test').addEventListener('click', qzTest);
 loadQz();
