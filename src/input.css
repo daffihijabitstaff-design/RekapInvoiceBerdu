@@ -438,3 +438,45 @@
     flex: none;
   }
 }
+
+/* ---------- invoice: tanpa bingkai, garis detail tipis, header tegas, rapi ---------- */
+@layer components {
+  .inv-sheet {
+    border: 0;
+  }
+  .inv-sheet .sep {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    border-top-width: 1px;
+  }
+  .inv-sheet table.inv-tbl th {
+    border-bottom-width: 2px;
+    border-bottom-color: #0f172a;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-weight: 800;
+  }
+  .inv-sheet table.inv-lines td {
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #cbd5e1;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    font-weight: 400;
+    color: #0f172a;
+  }
+  .inv-sheet table.inv-lines td b {
+    font-weight: 400;
+  }
+  .inv-sheet table.inv-lines tbody tr:last-child td {
+    border-bottom-color: #0f172a;
+    border-bottom-width: 2px;
+  }
+  .inv-sheet table.inv-tbl tfoot td {
+    border-top-width: 2px;
+    border-top-color: #0f172a;
+    border-bottom-width: 0;
+    padding-top: 8px;
+    font-weight: 800;
+  }
+}
