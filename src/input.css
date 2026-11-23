@@ -336,3 +336,44 @@
     break-after: auto;
   }
 }
+
+/* ---------- invoice: bingkai & garis 2px, huruf lebih tegas (layout tidak berubah) ---------- */
+@layer components {
+  .inv-sheet {
+    @apply border-2 border-gray-900 text-black;
+    font-weight: 500;
+  }
+  .inv-sheet .inv-store {
+    font-weight: 800;
+  }
+  .inv-sheet .inv-title {
+    font-weight: 800;
+  }
+  .inv-sheet .inv-no {
+    font-weight: 700;
+  }
+  .inv-sheet .inv-kv dt {
+    @apply font-semibold text-gray-700;
+  }
+  .inv-sheet .inv-kv dd {
+    @apply font-bold text-black;
+  }
+  .inv-sheet .sep {
+    @apply my-2 border-0 border-t-2 border-solid border-gray-900;
+  }
+  .inv-sheet table.inv-tbl th {
+    @apply border-b-2 border-gray-900 font-extrabold text-gray-900;
+  }
+  .inv-sheet table.inv-lines td {
+    @apply border-b-2 border-solid border-gray-900 font-semibold text-black;
+  }
+  .inv-sheet table.inv-lines td.inv-prod-cell {
+    @apply font-extrabold;
+  }
+  .inv-sheet table.inv-tbl tfoot td {
+    @apply border-t-2 border-gray-900 font-extrabold text-black;
+  }
+  .inv-sheet .inv-foot {
+    @apply font-semibold text-gray-800;
+  }
+}
