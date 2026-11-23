@@ -873,6 +873,10 @@ const ALIGN_C = '\x1B\x61\x01', ALIGN_L = '\x1B\x61\x00';
 const BOLD_ON = '\x1B\x45\x01', BOLD_OFF = '\x1B\x45\x00';
 const DBL_ON = '\x1D\x21\x11', DBL_OFF = '\x1D\x21\x00';
 const W58 = 48;                            // Font A pada kertas 80 mm
+// garis tipis 2 titik (GS v 0): 576 titik lebar, 2 baris tinggi, semua hitam
+const HAIRLINE = '\x1D\x76\x30\x00\x48\x00\x02\x00' + '\xFF'.repeat(72 * 2);
+// QZ mengubah teks biasa ke UTF-8, jadi byte biner dikirim sebagai heksadesimal
+const toHex = str => Array.from(str, c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 
 function loadQz() {
   try {
@@ -942,16 +946,19 @@ function escposInvoice(inv, feed) {
   }
   s += rule();
   s += BOLD_ON + row3('PRODUK', 'WARNA', 'QTY') + '\n' + BOLD_OFF;
+  // setiap baris produk dipisah garis tipis; baris yang dibungkus tidak diberi garis
+  const blocks = [];
   for (const g of inv.groups) {
     g.colors.forEach((c, j) => {
       const pl = j === 0 ? wrapText(g.prod, 24) : [''];
       const wl = wrapText(c.warna, 14);
       const n = Math.max(pl.length, wl.length);
-      for (let k = 0; k < n; k++) {
-        s += row3(pl[k] || '', wl[k] || '', k === 0 ? c.qty + 'x' : '') + '\n';
-      }
+      let b = '';
+      for (let k = 0; k < n; k++) b += row3(pl[k] || '', wl[k] || '', k === 0 ? c.qty + 'x' : '') + '\n';
+      blocks.push(b);
     });
   }
+  s += blocks.join(HAIRLINE);
   s += rule();
   s += BOLD_ON + row2('TOTAL JUMLAH', inv.pcs + 'x') + '\n' + BOLD_OFF;
   s += '\n' + '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis potong
@@ -1013,7 +1020,7 @@ async function qzPrintList(list) {
   try {
     const printer = await qzPrinterName();
     const cfg = qz.configs.create(printer);
-    const data = printOrder(list).map(inv => ({ type: 'raw', format: 'command', flavor: 'plain', data: escposInvoice(inv, QZ.feed) }));
+    const data = printOrder(list).map(inv => ({ type: 'raw', format: 'command', flavor: 'hex', data: toHex(escposInvoice(inv, QZ.feed)) }));
     await qz.print(cfg, data);
     setQzStatus(`Terkirim ke ${printer}: ${list.length} invoice dipotong otomatis.`);
     if (PRINT_STEP) showConfirm();
@@ -1027,7 +1034,7 @@ async function qzTest() {
   try {
     const printer = await qzPrinterName();
     const cfg = qz.configs.create(printer);
-    await qz.print(cfg, [{ type: 'raw', format: 'command', flavor: 'plain', data: ESC_INIT + ALIGN_C + 'TES KONEKSI\n' + ESC_FEED(QZ.feed) + ESC_CUT }]);
+    await qz.print(cfg, [{ type: 'raw', format: 'command', flavor: 'hex', data: toHex(ESC_INIT + ALIGN_C + 'TES KONEKSI\n' + ESC_FEED(QZ.feed) + ESC_CUT) }]);
     setQzStatus(`Printer ${printer} siap. Potong otomatis aktif.`);
   } catch (err) {
     setQzStatus('Gagal: ' + (err && err.message ? err.message : err) + '.', true);
