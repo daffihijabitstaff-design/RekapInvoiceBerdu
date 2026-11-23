@@ -601,3 +601,15 @@
     font-size: 1.2em;
   }
 }
+
+/* ---------- invoice thermal: TOTAL JUMLAH sebesar INVOICE, garis potong lebih tipis ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80 table.inv-tbl tfoot td,
+  .inv-sheet.paper-thermal58 table.inv-tbl tfoot td {
+    font-size: 1.2em;
+  }
+  .inv-sheet .inv-cut::before,
+  .inv-sheet .inv-cut::after {
+    border-top-width: 1px;
+  }
+}
