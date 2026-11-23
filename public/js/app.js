@@ -532,7 +532,7 @@ function invoiceTableHTML(rows, price) {
     return h;
   }).join('');
   const head = `<tr>
-    <th class="w-16"></th><th>Customer</th><th class="hidden md:table-cell">Metode</th>
+    <th class="w-16">${checkBox('data-check-all', 'all', 'semua invoice')}</th><th>Customer</th><th class="hidden md:table-cell">Metode</th>
     <th class="num">Invoice</th><th class="num">Pcs</th>
     ${price ? '<th class="num">Total</th>' : ''}
     <th class="act-h">Aksi</th></tr>`;
@@ -630,6 +630,12 @@ function renderTables() {
 const selectedInvoices = () => INVOICES.filter(i => SEL.has(i.key));
 
 function syncChecks() {
+  const all = document.querySelector('[data-check-all]');
+  if (all) {
+    const n = INVOICES.filter(i => SEL.has(i.key)).length;
+    all.checked = INVOICES.length > 0 && n === INVOICES.length;
+    all.indeterminate = n > 0 && n < INVOICES.length;
+  }
   document.querySelectorAll('[data-check]').forEach(el => { el.checked = SEL.has(el.dataset.check); });
   document.querySelectorAll('[data-check-person]').forEach(el => {
     const p = PERSONS.find(x => x.person === el.dataset.checkPerson);
@@ -649,7 +655,9 @@ function updateSelectionUI() {
 
 function onCheckChange(e) {
   const t = e.target;
-  if (t.dataset.check) {
+  if (t.dataset.checkAll !== undefined) {
+    INVOICES.forEach(i => (t.checked ? SEL.add(i.key) : SEL.delete(i.key)));
+  } else if (t.dataset.check) {
     if (t.checked) SEL.add(t.dataset.check); else SEL.delete(t.dataset.check);
   } else if (t.dataset.checkPerson) {
     const p = PERSONS.find(x => x.person === t.dataset.checkPerson);
