@@ -212,6 +212,21 @@
       </div>
     </section>
 
+    <section class="rounded-lg border border-gray-200 p-3">
+      <label class="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-gray-800">
+        <input id="qz-on" type="checkbox" class="h-4 w-4 cursor-pointer accent-accent-600">
+        Cetak langsung via QZ Tray (auto cut)
+      </label>
+      <div id="qz-box" class="mt-3 space-y-2" hidden>
+        <label for="qz-printer" class="block text-xs text-gray-600">Nama printer di Windows</label>
+        <input id="qz-printer" type="text" value="TM-T82" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-[13px] focus:border-accent-600 focus:outline-none focus:ring-[3px] focus:ring-accent-200">
+        <label for="qz-feed" class="block text-xs text-gray-600">Feed sebelum potong (baris)</label>
+        <input id="qz-feed" type="number" min="0" max="20" value="3" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-[13px] focus:border-accent-600 focus:outline-none focus:ring-[3px] focus:ring-accent-200">
+        <button id="qz-test" type="button" class="btn btn-ghost h-9 w-full justify-center">Tes koneksi printer</button>
+        <p id="qz-status" class="text-xs text-gray-500">QZ Tray harus sudah berjalan di PC ini. Printer tersambung lewat USB.</p>
+      </div>
+    </section>
+
     <section class="flex flex-col gap-2">
       <button id="btn-convert" disabled class="btn btn-primary h-10 justify-center text-sm">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
@@ -309,6 +324,7 @@
 
 <div id="print-area"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.6/qz-tray.js"></script>
 <script src="/vendor/xlsx.full.min.js"></script>
 <script src="/js/app.js"></script>
 </body>

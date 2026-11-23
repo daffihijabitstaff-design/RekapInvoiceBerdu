@@ -863,8 +863,146 @@ function preparePrint(sheetsHTML) {
 // Array.prototype.sort stabil, jadi invoice dengan panjang sama tetap urut nama customer.
 const printOrder = list => [...list].sort((a, b) => a.lines - b.lines);
 
+// ---------- QZ Tray: cetak raw ESC/POS ke Epson TM-T82X II (USB), dengan perintah potong ----------
+const QZ_KEY = 'berdu-inv:qz';
+const QZ = { on: false, printer: 'TM-T82', feed: 3 };
+const ESC_CUT = '\x1D\x56\x41\x00';   // GS V 65 0: feed ke posisi potong lalu potong penuh
+const ESC_FEED = n => '\x1B\x64' + String.fromCharCode(n); // ESC d n: feed n baris
+const ESC_INIT = '\x1B\x40';
+const ALIGN_C = '\x1B\x61\x01', ALIGN_L = '\x1B\x61\x00';
+const BOLD_ON = '\x1B\x45\x01', BOLD_OFF = '\x1B\x45\x00';
+const DBL_ON = '\x1D\x21\x11', DBL_OFF = '\x1D\x21\x00';
+const W58 = 48;                            // Font A pada kertas 80 mm
+
+function loadQz() {
+  try {
+    const v = JSON.parse(localStorage.getItem(QZ_KEY) || 'null');
+    if (v) Object.assign(QZ, { on: !!v.on, printer: String(v.printer || QZ.printer), feed: Number(v.feed ?? QZ.feed) });
+  } catch (err) { /* abaikan */ }
+  $('qz-on').checked = QZ.on;
+  $('qz-printer').value = QZ.printer;
+  $('qz-feed').value = QZ.feed;
+  $('qz-box').hidden = !QZ.on;
+}
+
+function saveQz() {
+  try { localStorage.setItem(QZ_KEY, JSON.stringify(QZ)); } catch (err) { /* abaikan */ }
+}
+
+function setQzStatus(msg, bad = false) {
+  const el = $('qz-status');
+  el.textContent = msg;
+  el.className = 'text-xs ' + (bad ? 'text-red-700' : 'text-gray-500');
+}
+
+// ASCII saja untuk printer: huruf beraksen dibuang aksennya, sisanya jadi '?'
+const escAscii = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '?');
+
+// pecah teks per kata agar tidak terpotong, kata yang lebih panjang dari lebar dipatah
+function wrapText(text, width) {
+  const words = escAscii(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = '';
+  for (let w of words) {
+    while (w.length > width) {
+      if (cur) { lines.push(cur); cur = ''; }
+      lines.push(w.slice(0, width));
+      w = w.slice(width);
+    }
+    if (!cur) cur = w;
+    else if ((cur + ' ' + w).length <= width) cur += ' ' + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur || !lines.length) lines.push(cur);
+  return lines;
+}
+
+const row2 = (l, r) => l + ' '.repeat(Math.max(1, W58 - l.length - r.length)) + r;
+const row3 = (a, b, c) => a.padEnd(24) + b.padEnd(14) + c.padStart(10);
+const rule = () => '-'.repeat(W58) + '\n';
+
+// satu invoice sebagai byte ESC/POS, diakhiri garis potong dan perintah potong
+function escposInvoice(inv, feed) {
+  const created = inv.orders[0] ? inv.orders[0].created : '';
+  let s = ESC_INIT;
+  s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama) + '\n' + DBL_OFF;
+  s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
+  s += rule();
+  s += BOLD_ON + row2('INVOICE', escAscii(inv.invNo)) + '\n' + BOLD_OFF;
+  const meta = [
+    ['Tanggal', fmtDate(inv.first)],
+    created ? ['Waktu order', created] : null,
+    ['Kepada', inv.name],
+    ['Pengiriman', inv.pickup],
+    inv.resi && inv.resi.length ? ['Resi', inv.resi.join(', ')] : null,
+  ].filter(Boolean);
+  for (const [k, v] of meta) {
+    const vl = wrapText(v, W58 - 13);
+    vl.forEach((line, i) => { s += (i === 0 ? k.padEnd(13) : ' '.repeat(13)) + line + '\n'; });
+  }
+  s += rule();
+  s += BOLD_ON + row3('PRODUK', 'WARNA', 'QTY') + '\n' + BOLD_OFF;
+  for (const g of inv.groups) {
+    g.colors.forEach((c, j) => {
+      const pl = j === 0 ? wrapText(g.prod, 24) : [''];
+      const wl = wrapText(c.warna, 14);
+      const n = Math.max(pl.length, wl.length);
+      for (let k = 0; k < n; k++) {
+        s += row3(pl[k] || '', wl[k] || '', k === 0 ? c.qty + 'x' : '') + '\n';
+      }
+    });
+  }
+  s += rule();
+  s += BOLD_ON + row2('TOTAL JUMLAH', inv.pcs + 'x') + '\n' + BOLD_OFF;
+  s += '\n' + '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis potong
+  s += ESC_FEED(feed) + ESC_CUT;
+  return s;
+}
+
+async function qzConnect() {
+  if (typeof qz === 'undefined') throw new Error('Library QZ Tray belum termuat. Periksa koneksi internet.');
+  if (!qz.websocket.isActive()) await qz.websocket.connect({ retries: 1, delay: 1 });
+}
+
+async function qzPrinterName() {
+  await qzConnect();
+  const found = await qz.printers.find(QZ.printer.trim());
+  return Array.isArray(found) ? found[0] : found;
+}
+
+async function qzPrintList(list) {
+  if (PAPER !== 'thermal80') {
+    setQzStatus('QZ Tray hanya untuk kertas Thermal 80 mm. Ubah ukuran kertas di panel kanan.', true);
+    return;
+  }
+  setQzStatus('Mengirim ke printer...');
+  try {
+    const printer = await qzPrinterName();
+    const cfg = qz.configs.create(printer);
+    const data = printOrder(list).map(inv => ({ type: 'raw', format: 'command', flavor: 'plain', data: escposInvoice(inv, QZ.feed) }));
+    await qz.print(cfg, data);
+    setQzStatus(`Terkirim ke ${printer}: ${list.length} invoice dipotong otomatis.`);
+    if (PRINT_STEP) showConfirm();
+  } catch (err) {
+    setQzStatus('Gagal: ' + String(err && err.message ? err.message : err).replace(/\.$/, '') + '. Pastikan QZ Tray berjalan dan nama printer benar.', true);
+  }
+}
+
+async function qzTest() {
+  setQzStatus('Mengecek printer...');
+  try {
+    const printer = await qzPrinterName();
+    const cfg = qz.configs.create(printer);
+    await qz.print(cfg, [{ type: 'raw', format: 'command', flavor: 'plain', data: ESC_INIT + ALIGN_C + 'TES KONEKSI\n' + ESC_FEED(QZ.feed) + ESC_CUT }]);
+    setQzStatus(`Printer ${printer} siap. Potong otomatis aktif.`);
+  } catch (err) {
+    setQzStatus('Gagal: ' + (err && err.message ? err.message : err) + '.', true);
+  }
+}
+
 function doPrint(list) {
   if (!list.length) return;
+  if (QZ.on) return qzPrintList(list);
   preparePrint(printOrder(list).map(invoiceHTML).join(''));
   window.print();
 }
@@ -1194,6 +1332,15 @@ $('btn-copy-url').addEventListener('click', async () => {
 window.addEventListener('afterprint', () => { if (PRINT_STEP) showConfirm(); });
 $('btn-print-rekap').addEventListener('click', printRekap);
 
+$('qz-on').addEventListener('change', e => {
+  QZ.on = e.target.checked;
+  $('qz-box').hidden = !QZ.on;
+  saveQz();
+});
+$('qz-printer').addEventListener('change', e => { QZ.printer = e.target.value.trim() || 'TM-T82'; saveQz(); });
+$('qz-feed').addEventListener('change', e => { QZ.feed = Math.min(20, Math.max(0, Number(e.target.value) || 0)); e.target.value = QZ.feed; saveQz(); });
+$('qz-test').addEventListener('click', qzTest);
+loadQz();
 setTab('invoice');
 setViews();
 updateSummary();
