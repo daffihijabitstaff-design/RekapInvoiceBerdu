@@ -516,3 +516,59 @@
   .inv-sheet table.inv-tbl th { font-weight: 600; }
   .inv-sheet table.inv-tbl tfoot td { font-weight: 600; }
 }
+
+/* ---------- invoice thermal: tampilan seperti struk printer (font kecil, garis tipis, tanpa bold) ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80,
+  .inv-sheet.paper-thermal58 {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: #111;
+  }
+  .inv-sheet.paper-thermal80 .inv-store,
+  .inv-sheet.paper-thermal58 .inv-store { font-weight: 700; }
+  .inv-sheet.paper-thermal80 .inv-title,
+  .inv-sheet.paper-thermal80 .inv-no,
+  .inv-sheet.paper-thermal58 .inv-title,
+  .inv-sheet.paper-thermal58 .inv-no,
+  .inv-sheet.paper-thermal80 .inv-kv dd,
+  .inv-sheet.paper-thermal58 .inv-kv dd,
+  .inv-sheet.paper-thermal80 .inv-kv dd b,
+  .inv-sheet.paper-thermal58 .inv-kv dd b { font-weight: 400; }
+  .inv-sheet.paper-thermal80 .inv-kv dt,
+  .inv-sheet.paper-thermal58 .inv-kv dt { color: #111; font-weight: 400; }
+  .inv-sheet.paper-thermal80 .sep,
+  .inv-sheet.paper-thermal58 .sep {
+    border-width: 1px 0 0;
+    border-style: dashed;
+    border-color: #111;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+  .inv-sheet.paper-thermal80 table.inv-tbl th,
+  .inv-sheet.paper-thermal58 table.inv-tbl th {
+    border-bottom: 0;
+    padding: 2px 0;
+    font-weight: 400;
+    color: #111;
+  }
+  .inv-sheet.paper-thermal80 table.inv-lines td,
+  .inv-sheet.paper-thermal58 table.inv-lines td {
+    border-bottom: 1px solid #bdbdbd;
+    padding: 3px 0;
+    font-weight: 400;
+    color: #111;
+  }
+  .inv-sheet.paper-thermal80 table.inv-lines tbody tr:last-child td,
+  .inv-sheet.paper-thermal58 table.inv-lines tbody tr:last-child td { border-bottom-color: #bdbdbd; }
+  .inv-sheet.paper-thermal80 table.inv-tbl tfoot td,
+  .inv-sheet.paper-thermal58 table.inv-tbl tfoot td {
+    border-top: 1px dashed #111;
+    border-bottom: 0;
+    padding-top: 4px;
+    font-weight: 400;
+  }
+}
