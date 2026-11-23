@@ -622,11 +622,11 @@
   }
 }
 
-/* garis antar produk: hitam dan tipis (0,10 px) */
+/* garis antar produk: titik-titik halus seperti contoh */
 @layer components {
   .inv-sheet.paper-thermal80 table.inv-lines tbody tr td,
   .inv-sheet.paper-thermal58 table.inv-lines tbody tr td {
-    border-bottom: 0.1px solid #111;
+    border-bottom: 1px dotted #111;
   }
   .inv-sheet.paper-thermal80 table.inv-lines tbody tr:last-child td,
   .inv-sheet.paper-thermal58 table.inv-lines tbody tr:last-child td {
