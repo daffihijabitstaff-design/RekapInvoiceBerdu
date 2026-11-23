@@ -797,7 +797,8 @@ function preparePrint(sheetsHTML) {
     const pxToMm = 25.4 / 96;
     css = '';
     area.querySelectorAll('.inv-sheet').forEach((el, i) => {
-      const h = Math.ceil(el.getBoundingClientRect().height * pxToMm) + 3;
+      // tinggi diukur dari isi sebenarnya, ditambah sedikit ruang agar baris terakhir tidak terpotong
+      const h = Math.ceil(el.scrollHeight * pxToMm) + 6;
       css += `@page pg${i} { size: ${p.w} ${h}mm; margin: 0; }\n`;
       el.style.setProperty('page', `pg${i}`);
     });

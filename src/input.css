@@ -377,3 +377,35 @@
     @apply font-semibold text-gray-800;
   }
 }
+
+/* ---------- invoice thermal: huruf sans tegas, lebar tetap rata kiri-kanan ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80,
+  .inv-sheet.paper-thermal58 {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-rendering: geometricPrecision;
+  }
+  .inv-sheet.paper-thermal80 { font-size: 12px; }
+  .inv-sheet.paper-thermal58 { font-size: 11px; }
+  .inv-sheet.paper-thermal80 .inv-store,
+  .inv-sheet.paper-thermal58 .inv-store,
+  .inv-sheet.paper-thermal80 .inv-title,
+  .inv-sheet.paper-thermal58 .inv-title { font-weight: 800; }
+  /* isi tidak boleh melebarkan kolom: nama/warna panjang dipatah, bukan mendorong lebar kertas */
+  .inv-sheet.paper-thermal80 table,
+  .inv-sheet.paper-thermal58 table {
+    width: 100%;
+    max-width: 100%;
+  }
+  .inv-sheet.paper-thermal80 td,
+  .inv-sheet.paper-thermal58 td,
+  .inv-sheet.paper-thermal80 th,
+  .inv-sheet.paper-thermal58 th,
+  .inv-sheet.paper-thermal80 dd,
+  .inv-sheet.paper-thermal58 dd {
+    overflow-wrap: anywhere;
+  }
+}
