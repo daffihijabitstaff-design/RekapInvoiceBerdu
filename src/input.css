@@ -593,3 +593,11 @@
     font-size: 1.2em;
   }
 }
+
+/* ---------- invoice thermal: header tabel (Produk, Warna, Qty) sama besar dengan INVOICE ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80 table.inv-tbl th,
+  .inv-sheet.paper-thermal58 table.inv-tbl th {
+    font-size: 1.2em;
+  }
+}
