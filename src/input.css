@@ -572,3 +572,24 @@
     font-weight: 400;
   }
 }
+
+/* ---------- invoice thermal: nomor order sama besar dengan INVOICE, tidak terpotong ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80 .inv-no,
+  .inv-sheet.paper-thermal58 .inv-no {
+    font-size: 1.2em;
+    font-weight: 400;
+    letter-spacing: 0;
+    white-space: nowrap;
+    flex: none;
+  }
+  .inv-sheet.paper-thermal80 .inv-title-row,
+  .inv-sheet.paper-thermal58 .inv-title-row {
+    align-items: baseline;
+    gap: 6px;
+  }
+  .inv-sheet.paper-thermal80 .inv-title,
+  .inv-sheet.paper-thermal58 .inv-title {
+    font-size: 1.2em;
+  }
+}
