@@ -864,8 +864,8 @@ function preparePrint(sheetsHTML) {
 const printOrder = list => [...list].sort((a, b) => a.lines - b.lines);
 
 // ---------- QZ Tray: cetak raw ESC/POS ke Epson TM-T82X II (USB), dengan perintah potong ----------
-const QZ_KEY = 'berdu-inv:qz';
-const QZ = { on: false, printer: 'TM-T82', feed: 3 };
+const QZ_KEY = 'berdu-inv:qz-v2';   // v2: QZ Tray menjadi jalur utama secara default
+const QZ = { on: true, printer: 'TM-T82', feed: 3 };
 const ESC_CUT = '\x1D\x56\x41\x00';   // GS V 65 0: feed ke posisi potong lalu potong penuh
 const ESC_FEED = n => '\x1B\x64' + String.fromCharCode(n); // ESC d n: feed n baris
 const ESC_INIT = '\x1B\x40';
