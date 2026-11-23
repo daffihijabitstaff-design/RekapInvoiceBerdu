@@ -891,6 +891,12 @@ function setViews() {
   $('btn-convert').disabled = !has || CONVERTED;
   $('btn-convert').querySelector('span').textContent = CONVERTED ? 'Sudah dikonversi' : 'Convert to Invoice';
   $('btn-reset').hidden = !has;
+  const step = CONVERTED ? 2 : 1;
+  document.querySelectorAll('[data-step]').forEach(el => {
+    const n = Number(el.dataset.step);
+    el.classList.toggle('on', n === step);
+    el.classList.toggle('done', n < step);
+  });
 }
 
 function updateSummary() {

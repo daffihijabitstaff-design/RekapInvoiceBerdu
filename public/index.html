@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
   <title>Rekap Invoice Berdu</title>
   <meta name="description" content="Filter, kelompokkan, dan cetak invoice per customer dari ekspor order berdu.id">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,24 +13,38 @@
 </head>
 <body class="font-sans text-sm leading-snug">
 
-<div class="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
+<div class="mx-auto grid min-h-screen w-full max-w-[1240px] grid-cols-1 bg-white lg:my-6 lg:min-h-[calc(100vh-3rem)] lg:grid-cols-[minmax(0,1fr)_320px] lg:rounded-2xl lg:shadow-xl lg:ring-1 lg:ring-gray-200 xl:grid-cols-[minmax(0,1fr)_340px]">
 
   <!-- ============ AREA UTAMA ============ -->
-  <main class="flex min-h-screen min-w-0 flex-col bg-gradient-to-br from-indigo-50 via-white to-slate-100 p-4 md:p-6">
+  <main class="flex min-h-screen min-w-0 flex-col bg-slate-50 p-4 md:p-6">
 
-    <!-- Tahap 1: upload file (di tengah) -->
-    <section id="view-upload" class="grid flex-1 place-items-center">
-      <div class="w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <div class="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-2xl bg-accent-50 text-accent-600">
-          <svg viewBox="0 0 24 24" class="h-10 w-10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <path d="M12 11v5M9.5 13.5 12 11l2.5 2.5"/>
-          </svg>
+    <!-- Header aplikasi + stepper -->
+    <header class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-5 py-3.5">
+      <div class="flex items-center gap-3">
+        <div class="grid h-9 w-9 place-items-center rounded-lg bg-accent-600 text-white">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
         </div>
+        <div>
+          <div class="text-sm font-semibold">Rekap Invoice Berdu</div>
+          <div class="text-xs text-gray-500">Ekspor order berdu.id ke invoice per customer</div>
+        </div>
+      </div>
+      <nav class="steps flex flex-wrap items-center gap-2.5 text-xs" aria-label="Langkah kerja">
+        <div class="step on" data-step="1"><span class="step-n">1</span>Upload File</div>
+        <span class="step-sep"></span>
+        <div class="step" data-step="2"><span class="step-n">2</span>Preview &amp; Validasi</div>
+        <span class="step-sep"></span>
+        <div class="step" data-step="3"><span class="step-n">3</span>Cetak Invoice</div>
+      </nav>
+    </header>
+
+    <!-- Tahap 1: upload file -->
+    <section id="view-upload" class="flex flex-1 flex-col items-center justify-center">
+      <div class="w-full max-w-2xl rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h1 class="text-lg font-semibold">Upload file order</h1>
         <p class="mt-1 text-sm text-gray-500">Ekspor order berdu.id atau template gudang, format CSV atau XLSX</p>
 
-        <div id="dropzone" class="mt-6 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/60 px-6 py-8 transition">
+        <div id="dropzone" class="mt-5 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/60 px-6 py-8 text-center transition">
           <button type="button" id="btn-choose" class="btn btn-primary h-10 px-5 text-sm">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>
             <span>Pilih File</span>
@@ -45,10 +60,24 @@
           </div>
           <span class="shrink-0 text-xs text-emerald-700">Siap dikonversi</span>
         </div>
+
+        <div class="mt-6 border-t border-gray-100 pt-4">
+          <div class="mb-2.5 text-xs text-gray-500">Butuh format yang sesuai?</div>
+          <div class="grid gap-2.5 sm:grid-cols-2">
+            <a href="/templates/template-ekspor-berdu.csv" download class="btn btn-ghost h-11 justify-start px-3">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+              <span class="text-left leading-tight">Template Berdu.id<span class="block text-[11px] font-normal text-gray-500">Ekspor order · .CSV</span></span>
+            </a>
+            <a href="/templates/template-gudang.csv" download class="btn btn-ghost h-11 justify-start px-3">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+              <span class="text-left leading-tight">Template Gudang<span class="block text-[11px] font-normal text-gray-500">Tanpa harga · .CSV</span></span>
+            </a>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Tahap 2: hasil konversi -->
+<!-- Tahap 2: hasil konversi -->
     <section id="view-result" hidden class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-3">
         <div class="inline-flex gap-1 rounded-lg bg-gray-100 p-1">
@@ -117,7 +146,41 @@
   </main>
 
   <!-- ============ SIDEBAR KANAN ============ -->
-  <aside class="flex w-full shrink-0 flex-col gap-6 border-t border-gray-200 bg-white p-5 lg:sticky lg:top-0 lg:h-screen lg:overflow-auto lg:border-l lg:border-t-0">
+  <aside class="flex w-full shrink-0 flex-col gap-6 border-t border-gray-200 bg-white p-5 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:overflow-auto lg:border-l lg:border-t-0">
+
+    <section>
+      <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Ukuran kertas</h3>
+      <label for="paper" class="sr-only">Ukuran kertas</label>
+      <select id="paper" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-[13px] focus:border-accent-600 focus:outline-none focus:ring-[3px] focus:ring-accent-200">
+        <option value="thermal80">Thermal 80 mm</option>
+        <option value="thermal58">Thermal 58 mm</option>
+        <option value="a5">A5</option>
+      </select>
+      <div class="mt-3 flex items-end gap-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
+        <div class="w-[108px] shrink-0 whitespace-nowrap rounded-sm bg-white p-2 font-mono text-[9px] leading-snug text-gray-900 shadow-sm">
+          <div class="text-center font-bold tracking-wide">INVOICE</div>
+          <div class="my-1 border-t border-dashed border-gray-900"></div>
+          <div class="flex justify-between gap-1"><span>Contoh A</span><span>#1041</span></div>
+          <div class="my-1 border-t border-dashed border-gray-900"></div>
+          <div class="flex justify-between gap-1"><span>Produk Alfa</span><span>3</span></div>
+          <div class="text-[8px] text-gray-500">Hitam 2x · Navy 1x</div>
+          <div class="my-1 border-t border-dashed border-gray-900"></div>
+          <div class="flex justify-between font-bold"><span>TOTAL</span><span>3 pcs</span></div>
+        </div>
+        <p class="text-xs leading-relaxed text-gray-500">Contoh tampilan struk. Di dialog cetak, set margin ke None dan skala 100%.</p>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-2">
+      <button id="btn-convert" disabled class="btn btn-primary h-10 justify-center text-sm">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
+        <span>Convert to Invoice</span>
+      </button>
+      <button id="btn-reset" hidden class="btn btn-ghost h-9 justify-center">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg>
+        <span>Ganti file</span>
+      </button>
+    </section>
 
     <section>
       <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Ringkasan</h3>
@@ -144,28 +207,6 @@
       </div>
       <div id="sum-warn" hidden class="mt-3"></div>
     </section>
-
-    <section>
-      <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Cetak</h3>
-      <label for="paper" class="mb-1.5 block text-xs font-medium text-gray-700">Ukuran kertas</label>
-      <select id="paper" class="h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-[13px] focus:border-accent-600 focus:outline-none focus:ring-[3px] focus:ring-accent-200">
-        <option value="thermal80">Thermal 80 mm</option>
-        <option value="thermal58">Thermal 58 mm</option>
-        <option value="a5">A5</option>
-      </select>
-      <p class="mt-2 text-xs text-gray-500">Di dialog cetak, set margin ke None dan skala 100%.</p>
-    </section>
-
-    <div class="mt-auto flex flex-col gap-2">
-      <button id="btn-convert" disabled class="btn btn-primary h-10 justify-center text-sm">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
-        <span>Convert to Invoice</span>
-      </button>
-      <button id="btn-reset" hidden class="btn btn-ghost h-9 justify-center">
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg>
-        <span>Ganti file</span>
-      </button>
-    </div>
   </aside>
 </div>
 

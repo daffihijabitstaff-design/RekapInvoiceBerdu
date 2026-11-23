@@ -29,6 +29,29 @@
     @apply bg-white text-gray-900 shadow-sm;
   }
 
+  /* stepper header: 1 upload, 2 preview, 3 cetak */
+  .step {
+    @apply flex items-center gap-2 font-medium text-gray-400;
+  }
+  .step.on {
+    @apply font-semibold text-gray-900;
+  }
+  .step.done {
+    @apply text-emerald-700;
+  }
+  .step-n {
+    @apply grid h-6 w-6 place-items-center rounded-full border border-gray-300 bg-white text-[11px] font-semibold text-gray-500 transition-colors duration-150;
+  }
+  .step.on .step-n {
+    @apply border-accent-600 bg-accent-600 text-white;
+  }
+  .step.done .step-n {
+    @apply border-emerald-600 bg-emerald-50 text-emerald-700;
+  }
+  .step-sep {
+    @apply h-px w-6 bg-gray-300;
+  }
+
   /* tombol: ikon + label, animasi tekan dan hover */
   .btn {
     @apply inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-medium transition-all duration-150 ease-out active:scale-95 disabled:pointer-events-none disabled:opacity-40;

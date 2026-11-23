@@ -9,3 +9,4 @@ public/vendor/
 *.csv
 *.xlsx
 *.xls
+!public/templates/*.csv
