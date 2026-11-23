@@ -409,3 +409,32 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* ---------- invoice: detail produk tidak tebal, total jumlah, garis potong ---------- */
+@layer components {
+  .inv-sheet table.inv-lines td,
+  .inv-sheet table.inv-lines td.inv-prod-cell,
+  .inv-sheet table.inv-lines td.color,
+  .inv-sheet table.inv-lines td.qty,
+  .inv-sheet table.inv-lines td.name {
+    font-weight: 400;
+  }
+  .inv-sheet .inv-cut {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 22px;
+    color: #111827;
+  }
+  .inv-sheet .inv-cut::before,
+  .inv-sheet .inv-cut::after {
+    content: "";
+    flex: 1;
+    border-top: 2px dashed #111827;
+  }
+  .inv-sheet .inv-cut svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+}

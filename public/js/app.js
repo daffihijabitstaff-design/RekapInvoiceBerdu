@@ -713,7 +713,7 @@ function invoiceHTML(inv) {
       <thead>${head}</thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>
-        <td colspan="2">Total</td>
+        <td colspan="2">TOTAL JUMLAH</td>
         <td class="num">${inv.pcs}x</td>
         ${showHarga ? '<td></td>' : ''}
         ${ekspor ? `<td class="num">${rp(inv.sub)}</td>` : ''}
@@ -722,6 +722,7 @@ function invoiceHTML(inv) {
     ${ekspor ? `<div class="inv-sum"><span>Subtotal produk</span><b>${rp(inv.sub)}</b></div>` : ''}
     ${ekspor && inv.discount ? '<div class="inv-small">Order ini memakai diskon/voucher. Potongannya tidak dialokasikan per produk.</div>' : ''}
     ${inv.mismatch ? '<div class="inv-small">Total di file berbeda dari subtotal − diskon.</div>' : ''}
+    <div class="inv-cut" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg></div>
   </article>`;
 }
 
@@ -798,7 +799,7 @@ function preparePrint(sheetsHTML) {
     css = '';
     area.querySelectorAll('.inv-sheet').forEach((el, i) => {
       // tinggi diukur dari isi sebenarnya, ditambah sedikit ruang agar baris terakhir tidak terpotong
-      const h = Math.ceil(el.scrollHeight * pxToMm) + 6;
+      const h = Math.ceil(el.scrollHeight * pxToMm * 1.08) + 8;
       css += `@page pg${i} { size: ${p.w} ${h}mm; margin: 0; }\n`;
       el.style.setProperty('page', `pg${i}`);
     });
