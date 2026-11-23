@@ -613,3 +613,11 @@
     border-top-width: 1px;
   }
 }
+
+/* garis di atas TOTAL dibuat putus-putus: baris terakhir ikut putus-putus */
+@layer components {
+  .inv-sheet.paper-thermal80 table.inv-lines tbody tr:last-child td,
+  .inv-sheet.paper-thermal58 table.inv-lines tbody tr:last-child td {
+    border-bottom: 1px dashed #111;
+  }
+}
