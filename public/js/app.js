@@ -946,6 +946,7 @@ function escposInvoice(inv, feed) {
   }
   s += rule();
   s += BOLD_ON + row3('PRODUK', 'WARNA', 'QTY') + '\n' + BOLD_OFF;
+  s += '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis putus-putus di bawah header
   // setiap baris produk dipisah garis tipis; baris yang dibungkus tidak diberi garis
   const blocks = [];
   for (const g of inv.groups) {
