@@ -931,7 +931,7 @@ function escposInvoice(inv, feed) {
   let s = ESC_INIT;
   s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama) + '\n' + DBL_OFF;
   s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
-  s += rule();
+  s += '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis putus-putus di atas INVOICE
   s += BOLD_ON + row2('INVOICE', escAscii(inv.invNo)) + '\n' + BOLD_OFF;
   const meta = [
     ['Tanggal', fmtDate(inv.first)],
