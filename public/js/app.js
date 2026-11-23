@@ -328,6 +328,8 @@ let PERSONS = [];    // customer, berisi daftar invoice produk
 let REKAP = [];      // rekap per produk, berisi warna
 let SELECTED = null; // key invoice yang sedang dipreview
 let TAB = 'invoice';
+let PRINT_STEP = false; // tahap 3: cetak invoice yang dipilih
+const SEL = new Set();  // key invoice yang dicentang di tabel
 const EXPANDED = new Set(); // id baris yang sedang dibuka: "c:<person>", "p:<key>", "r:<produk>"
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -473,9 +475,11 @@ const ICON = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   note: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  arrowR: '<path d="M5 12h14M12 5l7 7-7 7"/>',
 };
 const icon = (k, cls = 'h-3.5 w-3.5') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 const btn = (kind, ic, label, attrs = '') => `<button type="button" class="btn btn-${kind}" ${attrs}>${icon(ic)}<span>${label}</span></button>`;
+const checkBox = (attr, val, label) => `<input type="checkbox" class="h-4 w-4 cursor-pointer accent-accent-600" ${attr}="${esc(val)}" aria-label="Pilih ${esc(label)}">`;
 const toggleBtn = (id, open) => `<button type="button" class="toggle" data-toggle="${esc(id)}" aria-expanded="${open}" aria-label="${open ? 'Tutup detail' : 'Lihat detail'}">${icon('chevR', 'chev')}</button>`;
 
 // ---------- tabel: state paginasi & animasi ----------
@@ -494,7 +498,7 @@ function invoiceTableHTML(rows, price) {
     const id = 'c:' + p.person;
     const open = EXPANDED.has(id);
     let h = `<tr class="grp${open ? ' open' : ''}" data-row="${esc(id)}">
-      <td class="w-12">${toggleBtn(id, open)}</td>
+      <td class="w-16"><div class="flex items-center gap-1">${checkBox('data-check-person', p.person, p.name)}${toggleBtn(id, open)}</div></td>
       <td><div class="font-semibold">${esc(p.name)}</div><div class="text-xs text-gray-500">${p.orderCount} order</div>${p.notes.length ? `<div class="mt-1 flex max-w-xs items-start gap-1 text-[11px] text-amber-800" title="${esc(p.notes.join(' | '))}">${icon('note', 'mt-px h-3 w-3 shrink-0')}<span class="line-clamp-2">${esc(p.notes.join(' · '))}</span></div>` : ''}</td>
       <td class="hidden md:table-cell"><div class="flex flex-wrap gap-1">${p.metodes.map(m => `<span class="pill ${pillCls(m)}">${esc(metodeShort(m))}</span>`).join('')}</div></td>
       <td class="num">${p.invs.length}</td>
@@ -506,7 +510,7 @@ function invoiceTableHTML(rows, price) {
       const pid = 'p:' + inv.key;
       const po = EXPANDED.has(pid);
       h += `<tr class="lvl1${animCls(id)}" data-parent="${esc(id)}" data-row="${esc(pid)}"${fx(id, i)}>
-        <td>${toggleBtn(pid, po)}</td>
+        <td class="w-16"><div class="flex items-center gap-1">${checkBox('data-check', inv.key, inv.invNo)}${toggleBtn(pid, po)}</div></td>
         <td><div class="font-medium text-gray-900">${esc(inv.invNo)}</div><div class="text-[11px] text-gray-500">${inv.groups.length} produk · ${inv.lines} baris</div></td>
         <td class="hidden md:table-cell"><span class="pill ${pillCls(inv.metode)}">${esc(inv.metodeLabel || '—')}</span></td>
         <td></td>
@@ -528,7 +532,7 @@ function invoiceTableHTML(rows, price) {
     return h;
   }).join('');
   const head = `<tr>
-    <th class="w-12"></th><th>Customer</th><th class="hidden md:table-cell">Metode</th>
+    <th class="w-16"></th><th>Customer</th><th class="hidden md:table-cell">Metode</th>
     <th class="num">Invoice</th><th class="num">Pcs</th>
     ${price ? '<th class="num">Total</th>' : ''}
     <th class="act-h">Aksi</th></tr>`;
@@ -619,6 +623,41 @@ function renderTables() {
   $('pg-rekap').innerHTML = pagerHTML('rekap', rk);
 
   JUST.clear();
+  syncChecks();
+}
+
+// ---------- seleksi invoice untuk cetak ----------
+const selectedInvoices = () => INVOICES.filter(i => SEL.has(i.key));
+
+function syncChecks() {
+  document.querySelectorAll('[data-check]').forEach(el => { el.checked = SEL.has(el.dataset.check); });
+  document.querySelectorAll('[data-check-person]').forEach(el => {
+    const p = PERSONS.find(x => x.person === el.dataset.checkPerson);
+    const total = p ? p.invs.length : 0;
+    const n = p ? p.invs.filter(i => SEL.has(i.key)).length : 0;
+    el.checked = total > 0 && n === total;
+    el.indeterminate = n > 0 && n < total;
+  });
+}
+
+function updateSelectionUI() {
+  const n = selectedInvoices().length;
+  const b = $('btn-print-all');
+  b.disabled = n === 0;
+  b.querySelector('span').textContent = n ? `Lanjutkan Print (${n})` : 'Lanjutkan Print';
+}
+
+function onCheckChange(e) {
+  const t = e.target;
+  if (t.dataset.check) {
+    if (t.checked) SEL.add(t.dataset.check); else SEL.delete(t.dataset.check);
+  } else if (t.dataset.checkPerson) {
+    const p = PERSONS.find(x => x.person === t.dataset.checkPerson);
+    if (!p) return;
+    p.invs.forEach(i => (t.checked ? SEL.add(i.key) : SEL.delete(i.key)));
+  } else return;
+  syncChecks();
+  updateSelectionUI();
 }
 
 // ---------- tabel: toggle dengan animasi tutup ----------
@@ -774,7 +813,7 @@ function renderAll() {
   const sig = [METODE_SEL, $('q').value, FORMAT, FILE_NAME].join('|');
   if (sig !== LAST_SIG) { PAGE.invoice = 1; PAGE.rekap = 1; LAST_SIG = sig; }
   renderTables();
-  $('btn-print-all').disabled = !INVOICES.length;
+  updateSelectionUI();
   $('btn-print-rekap').disabled = !REKAP.length;
 
   if (SELECTED && !INVOICES.some(i => i.key === SELECTED)) closeModal();
@@ -826,6 +865,56 @@ function printRekap() {
   if (!REKAP.length) return;
   preparePrint(rekapSheetHTML());
   window.print();
+}
+
+// ---------- tahap 3: cetak invoice yang dipilih + konfirmasi ----------
+const CONFIRM_BASE = 'https://daffihijab.id/admin/order/bulk/print?ids=';
+
+function confirmUrl(list) {
+  return CONFIRM_BASE + list.map(i => i.invNo.replace(/^BERDU_/i, '')).join('_');
+}
+
+function renderPrintStep() {
+  const list = printOrder(selectedInvoices());
+  $('print-sub').textContent = `${list.length} invoice dipilih · ${PAPERS[PAPER].label} · urut dari yang paling pendek`;
+  $('print-list').innerHTML = list.length
+    ? list.map(invoiceHTML).join('')
+    : emptyHTML('Belum ada invoice yang dipilih.');
+  $('print-confirm').hidden = true;
+}
+
+function showConfirm() {
+  const list = printOrder(selectedInvoices());
+  if (!list.length) return;
+  // link konfirmasi memakai Order ID (BERDU_...). Tanpa kolom Order Id di file, nomor urut tidak boleh dipakai.
+  const ok = list.every(i => /^BERDU_/i.test(i.invNo));
+  $('btn-open-confirm').hidden = !ok;
+  $('btn-copy-url').hidden = !ok;
+  $('confirm-url').hidden = !ok;
+  if (ok) {
+    const url = confirmUrl(list);
+    $('confirm-url').textContent = url;
+    $('btn-open-confirm').href = url;
+    $('confirm-count').textContent = `${list.length} order akan ditandai.`;
+  } else {
+    $('confirm-url').textContent = '';
+    $('confirm-count').textContent = 'Link tidak dibuat: file ini tidak memuat kolom Order Id. Gunakan ekspor atau template yang memuat Order Id.';
+  }
+  $('print-confirm').hidden = false;
+  $('print-confirm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function goPrintStep() {
+  if (!selectedInvoices().length) return;
+  PRINT_STEP = true;
+  setViews();
+  renderPrintStep();
+  window.scrollTo(0, 0);
+}
+
+function backToTable() {
+  PRINT_STEP = false;
+  setViews();
 }
 
 // ---------- modal preview ----------
@@ -886,14 +975,15 @@ const CONVERT_STEPS = [
 function setViews() {
   const has = ALL.length > 0;
   $('view-upload').hidden = CONVERTED;
-  $('view-result').hidden = !CONVERTED;
+  $('view-result').hidden = !CONVERTED || PRINT_STEP;
+  $('view-print').hidden = !PRINT_STEP;
   $('picked').hidden = !has || CONVERTED;
   $('picked-name').textContent = FILE_NAME;
   $('filters').disabled = !CONVERTED;
   $('btn-convert').disabled = !has || CONVERTED;
   $('btn-convert').querySelector('span').textContent = CONVERTED ? 'Sudah dikonversi' : 'Convert to Invoice';
   $('btn-reset').hidden = !has;
-  const step = CONVERTED ? 2 : 1;
+  const step = PRINT_STEP ? 3 : CONVERTED ? 2 : 1;
   document.querySelectorAll('[data-step]').forEach(el => {
     const n = Number(el.dataset.step);
     el.classList.toggle('on', n === step);
@@ -1015,6 +1105,8 @@ function resetAll() {
   FILE_NAME = '';
   CONVERTED = false;
   SELECTED = null;
+  SEL.clear();
+  PRINT_STEP = false;
   EXPANDED.clear();
   closeModal();
   $('file').value = '';
@@ -1052,6 +1144,7 @@ $('paper').addEventListener('change', e => {
   PAPER = e.target.value;
   try { localStorage.setItem(PAPER_KEY, PAPER); } catch (err) { /* abaikan */ }
   if (SELECTED) refreshPreview();
+  if (PRINT_STEP) renderPrintStep();
 });
 
 // Tabel: toggle, aksi, dan paginasi
@@ -1074,7 +1167,23 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') stepPreview(1);
 });
 
-$('btn-print-all').addEventListener('click', () => doPrint(INVOICES));
+$('btn-print-all').addEventListener('click', goPrintStep);
+$('list').addEventListener('change', onCheckChange);
+$('btn-back-table').addEventListener('click', backToTable);
+$('btn-print-invoice').addEventListener('click', () => doPrint(selectedInvoices()));
+$('btn-to-confirm').addEventListener('click', showConfirm);
+$('btn-copy-url').addEventListener('click', async () => {
+  const url = $('confirm-url').textContent;
+  const el = $('btn-copy-url').querySelector('span');
+  try {
+    await navigator.clipboard.writeText(url);
+    el.textContent = 'Link tersalin';
+  } catch (err) {
+    el.textContent = 'Gagal menyalin, pilih teks link';
+  }
+  setTimeout(() => { el.textContent = 'Salin link'; }, 1600);
+});
+window.addEventListener('afterprint', () => { if (PRINT_STEP) showConfirm(); });
 $('btn-print-rekap').addEventListener('click', printRekap);
 
 setTab('invoice');
