@@ -503,3 +503,16 @@
     padding-bottom: 5px;
   }
 }
+
+/* ---------- invoice thermal: ukuran lebih kecil dan tebal seperlunya ---------- */
+@layer components {
+  .inv-sheet.paper-thermal80 { font-size: 11px; }
+  .inv-sheet.paper-thermal58 { font-size: 10px; }
+  .inv-sheet .inv-store,
+  .inv-sheet .inv-title { font-weight: 600; }
+  .inv-sheet .inv-no { font-weight: 500; }
+  .inv-sheet .inv-kv dd,
+  .inv-sheet .inv-kv dd b { font-weight: 500; }
+  .inv-sheet table.inv-tbl th { font-weight: 600; }
+  .inv-sheet table.inv-tbl tfoot td { font-weight: 600; }
+}

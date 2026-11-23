@@ -931,10 +931,10 @@ const rule = () => '-'.repeat(W58) + '\n';
 function escposInvoice(inv, feed) {
   const created = inv.orders[0] ? inv.orders[0].created : '';
   let s = ESC_INIT + FONT_A + LINE_TIGHT;
-  s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama) + '\n' + DBL_OFF;
+  s += ALIGN_C + BOLD_ON + escAscii(SENDER.nama) + '\n' + BOLD_OFF;
   s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
   s += rule();   // garis di atas INVOICE
-  s += BOLD_ON + row2('INVOICE', escAscii(inv.invNo)) + '\n' + BOLD_OFF;
+  s += row2('INVOICE', escAscii(inv.invNo)) + '\n';
   const meta = [
     ['Tanggal', fmtDate(inv.first)],
     created ? ['Waktu order', created] : null,
@@ -947,7 +947,7 @@ function escposInvoice(inv, feed) {
     vl.forEach((line, i) => { s += (i === 0 ? k.padEnd(13) : ' '.repeat(13)) + line + '\n'; });
   }
   s += rule();
-  s += BOLD_ON + row3('PRODUK', 'WARNA', 'QTY') + '\n' + BOLD_OFF;
+  s += row3('PRODUK', 'WARNA', 'QTY') + '\n';
   // setiap baris produk dipisah garis tipis; baris yang dibungkus tidak diberi garis
   const blocks = [];
   for (const g of inv.groups) {
@@ -962,7 +962,7 @@ function escposInvoice(inv, feed) {
   }
   s += blocks.join(HAIRLINE);
   s += rule();
-  s += BOLD_ON + row2('TOTAL JUMLAH', inv.pcs + 'x') + '\n' + BOLD_OFF;
+  s += row2('TOTAL JUMLAH', inv.pcs + 'x') + '\n';
   s += '\n' + '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis potong
   s += ESC_FEED(feed) + ESC_CUT;
   return s;
