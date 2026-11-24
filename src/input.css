@@ -673,3 +673,16 @@
 @layer components {
   .inv-sheet .inv-dash { border-top: 1px dashed #000; margin: 4px 0 6px; }
 }
+
+/* logo transparan: tanpa latar, beri jarak di bawah */
+@layer components {
+  .inv-sheet .inv-logo { width: 84px; height: auto; margin: 0 auto 10px; background: none; border: 0; box-shadow: none; }
+  .inv-sheet.paper-thermal80 .inv-logo, .inv-sheet.paper-thermal58 .inv-logo { width: 96px; height: auto; margin-bottom: 12px; }
+  .inv-sheet.paper-a5 .inv-logo { width: 56px; height: auto; margin-bottom: 8px; }
+  .inv-sheet .inv-dash { margin-top: 2px; }
+}
+
+/* tinggi logo sudah diketahui sebelum gambar termuat (agar pengukuran tinggi cetak tepat) */
+@layer components {
+  .inv-sheet .inv-logo { aspect-ratio: 586 / 618; height: auto; }
+}

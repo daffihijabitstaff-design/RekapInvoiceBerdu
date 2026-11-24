@@ -742,7 +742,7 @@ function invoiceHTML(inv) {
   return `
   <article class="inv-sheet ${cls}">
     <header class="inv-center">
-      <img class="inv-logo" src="/img/daffi-logo.jpg" alt="" width="84" height="84">
+      <img class="inv-logo" src="/img/daffi-logo.png" alt="" width="84">
       <div class="inv-dash"></div>
       <div class="inv-store">${esc(SENDER.nama)}</div>
       <div>${esc(SENDER.telp)}</div>
@@ -936,7 +936,7 @@ async function logoRaster() {
   if (LOGO_CACHE !== null) return LOGO_CACHE;
   try {
     const img = new Image();
-    img.src = '/img/daffi-logo.jpg';
+    img.src = '/img/daffi-logo.png';
     await img.decode();
     const W = 192, H = Math.round(img.naturalHeight * W / img.naturalWidth);
     const c = document.createElement('canvas');
@@ -980,7 +980,7 @@ async function logoRaster() {
 function escposInvoice(inv, feed, logo = '') {
   const created = inv.orders[0] ? inv.orders[0].created : '';
   let s = ESC_INIT + FONT_A + LINE_TIGHT;
-  s += logo;
+  s += logo + '\x1B\x64\x02';   // jarak di bawah logo
   s += rule();   // garis di atas nama toko
   s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama).toUpperCase() + '\n' + DBL_OFF;
   s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
@@ -1117,7 +1117,7 @@ async function printRekap() {
 }
 
 // muat logo di awal agar sudah ada di cache saat dibutuhkan
-new Image().src = '/img/daffi-logo.jpg';
+new Image().src = '/img/daffi-logo.png';
 
 // ---------- tahap 3: cetak invoice yang dipilih + konfirmasi ----------
 const CONFIRM_BASE = 'https://daffihijab.id/admin/order/bulk/print?ids=';
