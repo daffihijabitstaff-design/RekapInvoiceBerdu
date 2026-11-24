@@ -742,7 +742,7 @@ function invoiceHTML(inv) {
   return `
   <article class="inv-sheet ${cls}">
     <header class="inv-center">
-      <img class="inv-logo" src="/img/daffi-logo.png" alt="" width="84">
+      <img class="inv-logo" src="/img/daffi-logo-bw.png" alt="" width="84">
       <div class="inv-dash"></div>
       <div class="inv-store">${esc(SENDER.nama)}</div>
       <div>${esc(SENDER.telp)}</div>

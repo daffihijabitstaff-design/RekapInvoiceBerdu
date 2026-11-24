@@ -686,3 +686,43 @@
 @layer components {
   .inv-sheet .inv-logo { aspect-ratio: 586 / 618; height: auto; }
 }
+
+/* ---------- cetak dari browser: hitam pekat, tanpa abu-abu, supaya setajam struk QZ Tray ---------- */
+@media print {
+  .inv-sheet.paper-thermal80,
+  .inv-sheet.paper-thermal58 {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #000;
+  }
+  .inv-sheet.paper-thermal80 .inv-logo,
+  .inv-sheet.paper-thermal58 .inv-logo {
+    filter: none;
+    image-rendering: pixelated;
+    width: 96px;
+  }
+  .inv-sheet.paper-thermal80 .sep,
+  .inv-sheet.paper-thermal58 .sep,
+  .inv-sheet.paper-thermal80 .inv-dash,
+  .inv-sheet.paper-thermal58 .inv-dash,
+  .inv-sheet.paper-thermal80 table.inv-lines tbody tr:last-child td,
+  .inv-sheet.paper-thermal58 table.inv-lines tbody tr:last-child td,
+  .inv-sheet.paper-thermal80 table.inv-lines tfoot td,
+  .inv-sheet.paper-thermal58 table.inv-lines tfoot td {
+    border-top: 2px dashed #000 !important;
+    border-bottom: 0 !important;
+    border-color: #000 !important;
+  }
+  .inv-sheet.paper-thermal80 table.inv-lines tbody tr td,
+  .inv-sheet.paper-thermal58 table.inv-lines tbody tr td {
+    border-bottom: 1px solid #000 !important;
+  }
+  .inv-sheet.paper-thermal80 table.inv-lines tbody tr:last-child td,
+  .inv-sheet.paper-thermal58 table.inv-lines tbody tr:last-child td {
+    border-bottom: 2px dashed #000 !important;
+  }
+  .inv-sheet.paper-thermal80 *,
+  .inv-sheet.paper-thermal58 * {
+    color: #000 !important;
+  }
+}
