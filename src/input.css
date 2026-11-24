@@ -633,3 +633,43 @@
     border-bottom: 1px dashed #111;
   }
 }
+
+/* ---------- invoice: logo di atas header, nama toko kapital, hitam putih ---------- */
+@layer components {
+  .inv-sheet .inv-logo {
+    display: block;
+    margin: 0 auto 4px;
+    width: 84px;
+    height: 84px;
+    object-fit: contain;
+    filter: grayscale(1) contrast(1.4);
+  }
+  .inv-sheet.paper-thermal80 .inv-logo,
+  .inv-sheet.paper-thermal58 .inv-logo { width: 96px; height: 96px; }
+  .inv-sheet.paper-thermal80 .inv-store,
+  .inv-sheet.paper-thermal58 .inv-store {
+    text-transform: uppercase;
+    font-size: 1.7em;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+  .inv-sheet.paper-thermal80,
+  .inv-sheet.paper-thermal58,
+  .inv-sheet.paper-thermal80 *,
+  .inv-sheet.paper-thermal58 * {
+    color: #000;
+    border-color: #000;
+  }
+  .inv-sheet.paper-thermal80 table.inv-lines tbody tr td,
+  .inv-sheet.paper-thermal58 table.inv-lines tbody tr td {
+    border-bottom-color: #000;
+  }
+}
+
+@layer components {
+  .inv-sheet.paper-a5 .inv-logo { width: 56px; height: 56px; margin-bottom: 2px; }
+}
+
+@layer components {
+  .inv-sheet .inv-dash { border-top: 1px dashed #000; margin: 4px 0 6px; }
+}

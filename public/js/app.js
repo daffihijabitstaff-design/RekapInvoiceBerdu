@@ -742,6 +742,8 @@ function invoiceHTML(inv) {
   return `
   <article class="inv-sheet ${cls}">
     <header class="inv-center">
+      <img class="inv-logo" src="/img/daffi-logo.jpg" alt="" width="84" height="84">
+      <div class="inv-dash"></div>
       <div class="inv-store">${esc(SENDER.nama)}</div>
       <div>${esc(SENDER.telp)}</div>
     </header>
@@ -928,10 +930,59 @@ const row3 = (a, b, c) => a.padEnd(24) + b.padEnd(14) + c.padStart(10);
 const rule = () => '-'.repeat(W58) + '\n';
 
 // satu invoice sebagai byte ESC/POS, diakhiri garis potong dan perintah potong
-function escposInvoice(inv, feed) {
+// logo -> bitmap hitam putih (GS v 0), lebar 192 titik, dithering agar detail tetap terlihat
+let LOGO_CACHE = null;
+async function logoRaster() {
+  if (LOGO_CACHE !== null) return LOGO_CACHE;
+  try {
+    const img = new Image();
+    img.src = '/img/daffi-logo.jpg';
+    await img.decode();
+    const W = 192, H = Math.round(img.naturalHeight * W / img.naturalWidth);
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    g.drawImage(img, 0, 0, W, H);
+    const px = g.getImageData(0, 0, W, H).data;
+    const lum = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) lum[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+    const bits = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x, old = lum[i], nv = old < 128 ? 0 : 255;
+        bits[i] = nv === 0 ? 1 : 0;
+        const err = old - nv;
+        if (x + 1 < W) lum[i + 1] += err * 7 / 16;
+        if (y + 1 < H) {
+          if (x > 0) lum[i + W - 1] += err * 3 / 16;
+          lum[i + W] += err * 5 / 16;
+          if (x + 1 < W) lum[i + W + 1] += err * 1 / 16;
+        }
+      }
+    }
+    const bpr = W / 8;
+    let data = '';
+    for (let y = 0; y < H; y++) {
+      for (let xb = 0; xb < bpr; xb++) {
+        let v = 0;
+        for (let b = 0; b < 8; b++) if (bits[y * W + xb * 8 + b]) v |= 0x80 >> b;
+        data += String.fromCharCode(v);
+      }
+    }
+    LOGO_CACHE = ALIGN_C + '\x1D\x76\x30\x00' + String.fromCharCode(bpr, 0, H & 0xff, H >> 8) + data + '\n' + ALIGN_L;
+  } catch (err) {
+    LOGO_CACHE = '';   // tanpa logo bila gambar gagal dimuat
+  }
+  return LOGO_CACHE;
+}
+
+function escposInvoice(inv, feed, logo = '') {
   const created = inv.orders[0] ? inv.orders[0].created : '';
   let s = ESC_INIT + FONT_A + LINE_TIGHT;
-  s += ALIGN_C + BOLD_ON + escAscii(SENDER.nama) + '\n' + BOLD_OFF;
+  s += logo;
+  s += rule();   // garis di atas nama toko
+  s += ALIGN_C + BOLD_ON + DBL_ON + escAscii(SENDER.nama).toUpperCase() + '\n' + DBL_OFF;
   s += escAscii(SENDER.telp) + '\n' + BOLD_OFF + ALIGN_L;
   s += rule();   // garis di atas INVOICE
   s += row2('INVOICE', escAscii(inv.invNo)) + '\n';
@@ -1022,7 +1073,8 @@ async function qzPrintList(list) {
   try {
     const printer = await qzPrinterName();
     const cfg = qz.configs.create(printer);
-    const data = printOrder(list).map(inv => ({ type: 'raw', format: 'command', flavor: 'hex', data: toHex(escposInvoice(inv, QZ.feed)) }));
+    const logo = await logoRaster();
+    const data = printOrder(list).map(inv => ({ type: 'raw', format: 'command', flavor: 'hex', data: toHex(escposInvoice(inv, QZ.feed, logo)) }));
     await qz.print(cfg, data);
     setQzStatus(`Terkirim ke ${printer}: ${list.length} invoice dipotong otomatis.`);
     if (PRINT_STEP) showConfirm();
