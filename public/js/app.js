@@ -1095,18 +1095,29 @@ async function qzTest() {
   }
 }
 
-function doPrint(list) {
-  if (!list.length) return;
-  if (QZ.on) return qzPrintList(list);
-  preparePrint(printOrder(list).map(invoiceHTML).join(''));
+// tunggu gambar (logo) di area cetak selesai dimuat sebelum dialog print dibuka
+async function printWhenReady(html) {
+  preparePrint(html);
+  const pending = [...$('print-area').querySelectorAll('img')]
+    .filter(i => !i.complete)
+    .map(i => new Promise(r => { i.onload = i.onerror = r; }));
+  await Promise.all(pending);
   window.print();
 }
 
-function printRekap() {
-  if (!REKAP.length) return;
-  preparePrint(rekapSheetHTML());
-  window.print();
+async function doPrint(list) {
+  if (!list.length) return;
+  if (QZ.on) return qzPrintList(list);
+  await printWhenReady(printOrder(list).map(invoiceHTML).join(''));
 }
+
+async function printRekap() {
+  if (!REKAP.length) return;
+  await printWhenReady(rekapSheetHTML());
+}
+
+// muat logo di awal agar sudah ada di cache saat dibutuhkan
+new Image().src = '/img/daffi-logo.jpg';
 
 // ---------- tahap 3: cetak invoice yang dipilih + konfirmasi ----------
 const CONFIRM_BASE = 'https://daffihijab.id/admin/order/bulk/print?ids=';
