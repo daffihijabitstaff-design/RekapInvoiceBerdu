@@ -878,6 +878,7 @@ const BOLD_ON = '\x1B\x45\x01', BOLD_OFF = '\x1B\x45\x00';
 const DBL_ON = '\x1D\x21\x11', DBL_OFF = '\x1D\x21\x00';
 const W58 = 48;                            // Font A pada kertas 80 mm
 // garis tipis 1 titik (GS v 0): 576 titik lebar, 1 baris tinggi, semua hitam (sekitar 0,12 mm pada 203 dpi)
+const PAD = '\x1B\x4A\x0E';                // ESC J 14: ruang kosong ~1,75 mm di atas/bawah tiap produk
 const HAIRLINE = '\x1D\x76\x30\x00\x48\x00\x01\x00' + '\xFF'.repeat(72);
 // QZ mengubah teks biasa ke UTF-8, jadi byte biner dikirim sebagai heksadesimal
 const toHex = str => Array.from(str, c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
@@ -1008,7 +1009,8 @@ function escposInvoice(inv, feed, logo = '') {
       const n = Math.max(pl.length, wl.length);
       let b = '';
       for (let k = 0; k < n; k++) b += row3(pl[k] || '', wl[k] || '', k === 0 ? c.qty + 'x' : '') + '\n';
-      blocks.push(b);
+      // padding atas dan bawah per produk agar teks tidak mepet garis pemisah (ESC J: feed n titik)
+      blocks.push(PAD + b + PAD);
     });
   }
   s += blocks.join(HAIRLINE);

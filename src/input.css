@@ -726,3 +726,13 @@
     color: #000 !important;
   }
 }
+
+/* cetak browser: teks sedikit dipertebal dengan stroke agar tidak pudar di printer thermal */
+@media print {
+  .inv-sheet.paper-thermal80 *,
+  .inv-sheet.paper-thermal58 * {
+    -webkit-text-stroke: 0.35px #000;
+  }
+  .inv-sheet.paper-thermal80 .inv-logo,
+  .inv-sheet.paper-thermal58 .inv-logo { -webkit-text-stroke: 0; }
+}
