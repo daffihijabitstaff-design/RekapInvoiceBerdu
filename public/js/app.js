@@ -236,20 +236,21 @@ function checkNotation(rows) {
   });
 }
 
-// Jarak edit (Levenshtein) untuk mendeteksi typo
-function lev(a, b) {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const cur = [i];
-    for (let j = 1; j <= b.length; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    prev = cur;
+// Jarak edit <= 1 dalam satu pemindaian (O(panjang)), jauh lebih cepat daripada Levenshtein penuh
+function withinOne(a, b) {
+  if (a === b) return true;
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  let i = 0, j = 0, diff = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++diff > 1) return false;
+    if (la > lb) i++;
+    else if (la < lb) j++;
+    else { i++; j++; }
   }
-  return prev[b.length];
+  diff += (la - i) + (lb - j);
+  return diff <= 1;
 }
 
 // Pasangan nama yang mirip dan jarang muncul: kemungkinan typo dari nama yang lebih sering
@@ -257,7 +258,7 @@ function similarPairs(counts, minLen) {
   const names = [...counts.keys()], out = [];
   for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
     const a = names[i], b = names[j];
-    if (Math.min(a.length, b.length) < minLen || lev(a, b) > 1) continue;
+    if (Math.min(a.length, b.length) < minLen || !withinOne(a, b)) continue;
     if (a.replace(/\d/g, '') === b.replace(/\d/g, '')) continue;   // hanya angka yang beda (HAPPY 1 / HAPPY 2)
     const [rare, common] = counts.get(a) <= counts.get(b) ? [a, b] : [b, a];
     if (counts.get(rare) <= 2 && counts.get(common) >= counts.get(rare)) out.push([rare, common]);
@@ -329,6 +330,7 @@ let REKAP = [];      // rekap per produk, berisi warna
 let SELECTED = null; // key invoice yang sedang dipreview
 let TAB = 'invoice';
 let PRINT_STEP = false; // tahap 3: cetak invoice yang dipilih
+let CONVERTING = false; // konversi sedang berjalan (cegah klik ganda)
 const SEL = new Set();  // key invoice yang dicentang di tabel
 const EXPANDED = new Set(); // id baris yang sedang dibuka: "c:<person>", "p:<key>", "r:<produk>"
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -1053,8 +1055,10 @@ async function qzLoadPrinters() {
       sel.insertAdjacentHTML('afterbegin', `<option value="${esc(QZ.printer)}" disabled>${esc(QZ.printer)} (tidak ditemukan)</option>`);
     }
     if (names.includes(QZ.printer)) sel.value = QZ.printer;
-    else if (names.length) { QZ.printer = names[0]; sel.value = names[0]; saveQz(); }
-    setQzStatus(names.length ? `${names.length} printer terdeteksi. Tujuan: ${QZ.printer}.` : 'Tidak ada printer terdeteksi di Windows.', !names.length);
+    const missing = !names.includes(QZ.printer);
+    setQzStatus(!names.length ? 'Tidak ada printer terdeteksi di Windows.'
+      : missing ? `Printer tersimpan "${QZ.printer}" tidak ditemukan. Pilih printer lain di daftar.`
+      : `${names.length} printer terdeteksi. Tujuan: ${QZ.printer}.`, !names.length || missing);
     refreshPrintTarget();
   } catch (err) {
     setQzStatus('Gagal memuat daftar: ' + String(err && err.message ? err.message : err).replace(/\.$/, '') + '.', true);
@@ -1108,13 +1112,15 @@ async function printWhenReady(html) {
   const pending = [...$('print-area').querySelectorAll('img')]
     .filter(i => !i.complete)
     .map(i => new Promise(r => { i.onload = i.onerror = r; }));
-  await Promise.all(pending);
+  // batas 3 detik: gambar yang macet tidak boleh menahan dialog print
+  await Promise.race([Promise.all(pending), wait(3000)]);
   window.print();
 }
 
 async function doPrint(list) {
   if (!list.length) return;
-  if (QZ.on) return qzPrintList(list);
+  if (QZ.on && PAPER === 'thermal80') return qzPrintList(list);
+  if (QZ.on) setQzStatus('QZ Tray hanya untuk Thermal 80 mm. Mencetak lewat dialog browser untuk ' + PAPERS[PAPER].label + '.');
   await printWhenReady(printOrder(list).map(invoiceHTML).join(''));
 }
 
@@ -1296,9 +1302,11 @@ function fillFilterOptions() {
 
 async function loadFile(f) {
   if (!f) return;
+  const prevWarn = WARN;
   WARN = [];
   try {
     const rows = await fileToRows(f);
+    if (!rows.length || !rows[0] || !rows[0].length) throw new Error('File kosong atau tidak berisi tabel.');
     ALL = parseOrders(rows);
     checkTypos();
     FILE_NAME = f.name;
@@ -1309,7 +1317,9 @@ async function loadFile(f) {
     updateSummary();
     setViews();
   } catch (err) {
-    alert('Gagal membaca file: ' + err.message);
+    WARN = prevWarn;
+    renderWarnings();
+    alert('Gagal membaca file: ' + (err && err.message ? err.message : err));
   }
 }
 
@@ -1329,7 +1339,9 @@ function setStep(i, state) {
 
 // Setiap langkah menjalankan pekerjaan nyata, lalu memperbarui progress
 async function runConvert() {
-  if (!ALL.length || CONVERTED) return;
+  if (!ALL.length || CONVERTED || CONVERTING) return;
+  CONVERTING = true;
+  $('btn-convert').disabled = true;
   $('loader-steps').innerHTML = CONVERT_STEPS.map(s =>
     `<li class="flex items-center gap-2 text-gray-400"><span class="w-4 text-center">○</span><span>${esc(s)}</span></li>`).join('');
   $('loader-title').textContent = 'Mengonversi data';
@@ -1354,6 +1366,7 @@ async function runConvert() {
   await wait(500);
   $('loader').hidden = true;
   CONVERTED = true;
+  CONVERTING = false;
   setTab('invoice');
   setViews();
   renderAll();

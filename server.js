@@ -18,7 +18,13 @@ const TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  } catch (err) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Bad request');
+    return;
+  }
   let filePath = path.normalize(path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath));
 
   // cegah akses di luar folder public
