@@ -726,6 +726,16 @@ function onPageSize(e) {
 }
 
 // ---------- invoice ----------
+// catatan pembeli: di bawah TOTAL, dalam kotak garis tipis, teks biasa per baris
+function noteLines(inv) {
+  return inv.notes.flatMap(n => String(n).split('\n')).map(x => x.trim()).filter(Boolean);
+}
+function notesBlockHTML(inv) {
+  const lines = noteLines(inv);
+  if (!lines.length) return '';
+  return `<div class="inv-notes-box"><div class="inv-notes-h">Catatan dari pembeli</div>${lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+}
+
 function invoiceHTML(inv) {
   const cls = PAPERS[PAPER].cls;
   const narrow = PAPER === 'thermal58';
@@ -758,7 +768,6 @@ function invoiceHTML(inv) {
       <dt>Pengiriman</dt><dd>${esc(inv.pickup)}</dd>
       ${inv.resi.length ? `<dt>Resi</dt><dd>${inv.resi.map(esc).join('<br>')}</dd>` : ''}
     </dl>
-    ${inv.notes.length ? `<div class="inv-note"><b>Catatan:</b> ${inv.notes.map(esc).join(' | ')}</div>` : ''}
     <hr class="sep">
     <table class="inv-tbl inv-lines">
       <thead>${head}</thead>
@@ -770,6 +779,7 @@ function invoiceHTML(inv) {
         ${ekspor ? `<td class="num">${rp(inv.sub)}</td>` : ''}
       </tr></tfoot>
     </table>
+    ${notesBlockHTML(inv)}
     ${ekspor ? `<div class="inv-sum"><span>Subtotal produk</span><b>${rp(inv.sub)}</b></div>` : ''}
     ${ekspor && inv.discount ? '<div class="inv-small">Order ini memakai diskon/voucher. Potongannya tidak dialokasikan per produk.</div>' : ''}
     ${inv.mismatch ? '<div class="inv-small">Total di file berbeda dari subtotal − diskon.</div>' : ''}
@@ -1000,11 +1010,6 @@ function escposInvoice(inv, feed, logo = '') {
     const vl = wrapText(v, W58 - 13);
     vl.forEach((line, i) => { s += (i === 0 ? k.padEnd(13) : ' '.repeat(13)) + line + '\n'; });
   }
-  // catatan pembeli (sama seperti tampilan web), dibungkus sesuai lebar kertas
-  if (inv.notes && inv.notes.length) {
-    const nl = wrapText('Catatan: ' + inv.notes.join(' | '), W58);
-    nl.forEach(line => { s += line + '\n'; });
-  }
   s += rule();
   s += row3('PRODUK', 'WARNA', 'QTY') + '\n';
   // setiap baris produk dipisah garis tipis; baris yang dibungkus tidak diberi garis
@@ -1023,6 +1028,13 @@ function escposInvoice(inv, feed, logo = '') {
   s += blocks.join(HAIRLINE);
   s += rule();
   s += row2('TOTAL JUMLAH', inv.pcs + 'x') + '\n';
+  const nlines = noteLines(inv);
+  if (nlines.length) {
+    s += rule();
+    s += 'Catatan dari pembeli\n';
+    nlines.forEach(n => wrapText(n, W58).forEach(l => { s += l + '\n'; }));
+    s += rule();
+  }
   s += '\n' + '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis potong
   s += ESC_FEED(feed) + ESC_CUT;
   return s;
