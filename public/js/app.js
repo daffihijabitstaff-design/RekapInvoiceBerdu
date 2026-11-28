@@ -1032,7 +1032,10 @@ function escposInvoice(inv, feed, logo = '') {
   if (nlines.length) {
     s += rule();
     s += 'Catatan dari pembeli\n';
-    nlines.forEach(n => wrapText(n, W58).forEach(l => { s += l + '\n'; }));
+    // catatan panjang (lebih dari satu baris cetak) diberi ruang atas-bawah di tiap baris agar tidak berdempet
+    const wrapped = nlines.flatMap(n => wrapText(n, W58));
+    const spaced = wrapped.length > 1;
+    wrapped.forEach(l => { s += (spaced ? PAD : '') + l + '\n' + (spaced ? PAD : ''); });
     s += rule();
   }
   s += '\n' + '- '.repeat(W58 / 2).trimEnd() + '\n';   // garis potong
