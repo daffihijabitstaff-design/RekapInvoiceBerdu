@@ -998,6 +998,11 @@ function escposInvoice(inv, feed, logo = '') {
     const vl = wrapText(v, W58 - 13);
     vl.forEach((line, i) => { s += (i === 0 ? k.padEnd(13) : ' '.repeat(13)) + line + '\n'; });
   }
+  // catatan pembeli (sama seperti tampilan web), dibungkus sesuai lebar kertas
+  if (inv.notes && inv.notes.length) {
+    const nl = wrapText('Catatan: ' + inv.notes.join(' | '), W58);
+    nl.forEach(line => { s += line + '\n'; });
+  }
   s += rule();
   s += row3('PRODUK', 'WARNA', 'QTY') + '\n';
   // setiap baris produk dipisah garis tipis; baris yang dibungkus tidak diberi garis
